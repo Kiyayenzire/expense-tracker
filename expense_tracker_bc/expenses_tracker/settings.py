@@ -9,23 +9,34 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
-
+from decouple import config, Csv
 from pathlib import Path
+from dotenv import load_dotenv
+import os
+import sys
+import django_heroku
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-osg&%s4u#o)c)hj(ynj-zka!yx=sz1=ph-^j@!n(8(4g^-7e*g'
+SECRET_KEY = config('SECRET_KEY', default='unsafe-default-key-for-dev-only')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG', cast=bool)
 
+# ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv)
 ALLOWED_HOSTS = []
+
+
+AUTH_USER_MODEL = 'users.CustomUser'
 
 
 # Application definition
@@ -39,10 +50,19 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
-    'django_allauth',
+    # 'django_allauth', doesnt work 
     'users',
     'expenses',
+    'django.contrib.sites',        # Required by allauth
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
 ]
+
+
+SITE_ID = 1
+
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -50,6 +70,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -74,15 +95,33 @@ TEMPLATES = [
 WSGI_APPLICATION = 'expenses_tracker.wsgi.application'
 
 
-# Database
+# DATABASES
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'expensetracker_db',
+        'USER': 'postgres',
+        'PASSWORD': 'admin@USER97',
+        'HOST': 'localhost',
+        'PORT': 5432,
     }
 }
+
+
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': config('DB_NAME'),
+#         'USER': config('DB_USER'),
+#         'PASSWORD': config('DB_PASSWORD'),
+#         'HOST': config('DB_HOST'),
+#         'PORT': config('DB_PORT', cast=int),
+#     }
+# }
+
 
 
 # Password validation
@@ -125,3 +164,15 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+CELERY_BROKER_URL = 'redis://localhost:6379'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379'
+
+
+REST_FRAMEWORK = {
+    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
+    'PAGE_SIZE': 11,
+    # other settings...
+}
+
+

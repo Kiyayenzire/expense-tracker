@@ -1,0 +1,62 @@
+name: CI Workflow
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_USER: expensetracker_user
+          POSTGRES_PASSWORD: password123
+          POSTGRES_DB: expensetracker_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Set up Node
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Install backend dependencies
+      run: |
+        cd expense_tracker_backend
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run backend tests
+      run: |
+        cd expense_tracker_backend
+        python manage.py test
+
+    - name: Install frontend dependencies
+      run: |
+        cd expense_tracker_fe/expenses-tracker-frontend
+        npm install
+
+    - name: Run frontend build
+      run: |
+        cd expense_tracker_fe/expenses-tracker-frontend
+        npm run build
