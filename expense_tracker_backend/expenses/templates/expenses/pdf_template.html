@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Expense Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; font-size: 12px; }
+        h2 { text-align: center; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #000; padding: 6px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h2>Expense Report</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th>Category</th>
+                <th>Quantity</th>
+                <th>Rate</th>
+                <th>Total Amount (€)</th>
+                <th>Currency</th>
+                <th>Supplier</th>
+                <th>Country</th>
+                <th>Date</th>
+                <th>User</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for expense in expenses %}
+            <tr>
+                <td>{{ expense.item }}</td>
+                <td>{{ expense.category }}</td>
+                <td>{{ expense.quantity }}</td>
+                <td>{{ expense.rate }}</td>
+                <td>{{ expense.amount }}</td>
+                <td>{{ expense.currency }}</td>
+                <td>{{ expense.supplier }}</td>
+                <td>{{ expense.country }}</td>
+                <td>{{ expense.date }}</td>
+                <td>{{ expense.user }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
