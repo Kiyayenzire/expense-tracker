@@ -4,3 +4,5 @@ class CustomLimitOffsetPagination(LimitOffsetPagination):
     default_limit = 11
     # max_limit = None  # remove upper limit so users can get full list
     max_limit = 101  # remove upper limit so users can get full list
+
+

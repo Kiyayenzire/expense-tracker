@@ -1,13 +1,28 @@
+
+
 from django.contrib.auth.models import AbstractUser
 from django.db import models
-
-# Create your models here.
+import uuid
 
 
 class CustomUser(AbstractUser):
-    # ROLE_CHOICES = (
-    #     ('user', 'User'),
-    #     ('admin', 'Admin')
-    # )
-    # role = models.CharField(max_length=5, choices=ROLE_CHOICES, default='user')
-    pass
+    """
+    Custom user model.
+
+    Improvements included:
+    - Email must be unique (prevents duplicate accounts)
+    - activation_token used for email verification
+    """
+
+    email = models.EmailField(unique=True)
+
+    activation_token = models.UUIDField(
+        default=uuid.uuid4,
+        editable=False,
+        unique=True
+    )
+
+    def __str__(self):
+        return self.email
+
+

@@ -30,13 +30,32 @@ load_dotenv(os.path.join(BASE_DIR, '.env'))
 SECRET_KEY = config('SECRET_KEY', default='unsafe-default-key-for-dev-only')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', cast=bool)
 
-# ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv)
-ALLOWED_HOSTS = []
+DEBUG = config('DEBUG', cast=bool, default=False)
+
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv())
+
+CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', cast=Csv(), default='')
+
+# In development, allow the frontend to hit the API even if CORS_ALLOWED_ORIGINS is not set.
+if DEBUG and not CORS_ALLOWED_ORIGINS:
+    CORS_ALLOW_ALL_ORIGINS = True
 
 
-AUTH_USER_MODEL = 'users.CustomUser'
+
+AUTH_USER_MODEL = "users.CustomUser"
+
+AUTHENTICATION_BACKENDS = [
+    "users.authentication.EmailBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
+
+DEFAULT_FROM_EMAIL = "noreply@expensetracker.com"
+
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+
+
 
 
 # Application definition
@@ -65,6 +84,7 @@ SITE_ID = 1
 
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -169,10 +189,34 @@ CELERY_BROKER_URL = 'redis://localhost:6379'
 CELERY_RESULT_BACKEND = 'redis://localhost:6379'
 
 
+
+
+# REST_FRAMEWORK = {
+#     'DEFAULT_AUTHENTICATION_CLASSES': (
+#         'rest_framework_simplejwt.authentication.JWTAuthentication',
+#     ),
+#     'DEFAULT_FILTER_BACKENDS': [
+#         'django_filters.rest_framework.DjangoFilterBackend'
+#     ],
+#     'DEFAULT_PAGINATION_CLASS': 'core.pagination.CustomLimitOffsetPagination'
+# }
+
+
+# # vs
+
 REST_FRAMEWORK = {
-    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
-    'PAGE_SIZE': 11,
-    # other settings...
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend'
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'expenses.pagination.CustomLimitOffsetPagination',
 }
+
+
+
+
+
 
 
