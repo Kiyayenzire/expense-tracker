@@ -1,0 +1,107 @@
+:root {
+  --background: #f3f4f6;
+  --surface: #ffffff;
+  --text: #111827;
+  --muted: #6b7280;
+  --primary: #2563eb;
+  --accent: #10b981;
+  --border: #d1d5db;
+  --radius: 16px;
+}
+
+[data-theme="dark"] {
+  --background: #111827;
+  --surface: #1f2937;
+  --text: #f9fafb;
+  --muted: #9ca3af;
+  --border: #374151;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--background);
+  color: var(--text);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--primary);
+  color: white;
+  padding: 0.75rem 1.25rem;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #1d4ed8;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+.small-text {
+  color: var(--muted);
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.form-group input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  background: var(--background);
+  color: var(--text);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.theme-toggle button {
+  background: var(--accent);
+}

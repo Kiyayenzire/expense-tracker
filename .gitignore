@@ -1,52 +1,56 @@
-# =========================
-# Python / Django
-# =========================
+# Python
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
-
-# Virtual environments
-.venv/
-venv/
-
-# Environment variables
+*.$py.class
 .env
 .env.*
+.venv/
+venv/
+venv3/
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+.pyre/
 
-# Databases
+# Django
+*.log
+*.pot
+*.pyc
 *.sqlite3
-
-# Django generated files
-staticfiles/
 media/
+staticfiles/
+static/
 
-# =========================
-# Node / Frontend
-# =========================
+# Node
 node_modules/
 dist/
-dist-ssr/
-*.local
-
-# Logs
-logs/
-*.log
+/build/
+.DS_Store
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+yarn.lock
+pnpm-lock.yaml
 
-# =========================
-# Editors / OS
-# =========================
+# Docker
+**/docker-compose.override.yml
+**/.env
+
+# VS Code
 .vscode/
-.idea/
-.DS_Store
-Thumbs.db
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+
+# Temp files
+*.swp
+*.swo
+*.tmp
+
+# Directories
+frontend/dist/
+backend/static/
+backend/media/
