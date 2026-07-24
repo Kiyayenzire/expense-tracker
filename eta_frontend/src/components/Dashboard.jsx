@@ -454,29 +454,30 @@ function Dashboard({ token, onLogout, theme, setTheme }) {
         </div>
 
         <div className="card">
-        <div className="card">
-          <h2>Prediction for next month</h2>
-          {Object.keys(prediction).length ? (
-            <ul className="prediction-list">
-              {Object.entries(prediction).map(([category, amount]) => (
-                <li key={category}>{category}: {displaySymbol} {amount.toFixed ? amount.toFixed(2) : amount}</li>
-              ))}
-            </ul>
-          ) : (
-            <p>No prediction data available yet.</p>
-          )}
-        </div>
-        <div className="card">
-          <h2>Anomaly insights</h2>
-          {insights.anomalies.length ? (
-            <ul className="prediction-list">
-              {insights.anomalies.slice(0, 5).map((anomaly, index) => (
-                <li key={index}>{anomaly.category__name || 'Expense'} - {displaySymbol} {(anomaly.amount || 0).toFixed(2)} on {formatDateEU(anomaly.date)}</li>
-              ))}
-            </ul>
-          ) : (
-            <p>No anomalies detected.</p>
-          )}
+          <div className="card">
+            <h2>Prediction for next month</h2>
+            {Object.keys(prediction).length ? (
+              <ul className="prediction-list">
+                {Object.entries(prediction).map(([category, amount]) => (
+                  <li key={category}>{category}: {displaySymbol} {amount.toFixed ? amount.toFixed(2) : amount}</li>
+                ))}
+              </ul>
+            ) : (
+              <p>No prediction data available yet.</p>
+            )}
+          </div>
+          <div className="card">
+            <h2>Anomaly insights</h2>
+            {insights.anomalies.length ? (
+              <ul className="prediction-list">
+                {insights.anomalies.slice(0, 5).map((anomaly, index) => (
+                  <li key={index}>{anomaly.category__name || 'Expense'} - {displaySymbol} {(anomaly.amount || 0).toFixed(2)} on {formatDateEU(anomaly.date)}</li>
+                ))}
+              </ul>
+            ) : (
+              <p>No anomalies detected.</p>
+            )}
+          </div>
         </div>
       </div>
 

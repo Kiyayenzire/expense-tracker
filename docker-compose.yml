@@ -4,7 +4,7 @@ services:
   db:
     image: postgres:15-alpine
     env_file:
-      - ./.env
+      - ./.env.dev
     environment:
       POSTGRES_DB: ${DATABASE_NAME}
       POSTGRES_USER: ${DATABASE_USER}
@@ -22,7 +22,7 @@ services:
   backend:
     image: ghcr.io/your-github-username/backend:latest
     env_file:
-      - ./.env
+      - ./.env.dev
     environment:
       DJANGO_SETTINGS_MODULE: backend.settings
     expose:
@@ -36,7 +36,7 @@ services:
     image: ghcr.io/your-github-username/backend:latest
     command: celery -A backend worker --loglevel=info
     env_file:
-      - ./.env
+      - ./.env.dev
     depends_on:
       - db
       - redis
@@ -46,7 +46,7 @@ services:
     image: ghcr.io/your-github-username/backend:latest
     command: celery -A backend beat --loglevel=info
     env_file:
-      - ./.env
+      - ./.env.dev
     depends_on:
       - db
       - redis

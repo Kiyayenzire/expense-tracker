@@ -18,9 +18,9 @@ else:
     if dev_env_file.exists():
         environ.Env.read_env(dev_env_file)
 
-SECRET_KEY = env('DJANGO_SECRET_KEY')
-DEBUG = env('DJANGO_DEBUG')
-ALLOWED_HOSTS = env('DJANGO_ALLOWED_HOSTS')
+SECRET_KEY = env('DJANGO_SECRET_KEY', default='dev-secret-key')
+DEBUG = env('DJANGO_DEBUG', default=True)
+ALLOWED_HOSTS = env('DJANGO_ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
 
 INSTALLED_APPS = [
     'django.contrib.admin',
