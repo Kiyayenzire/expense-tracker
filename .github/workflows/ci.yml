@@ -88,3 +88,5 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/eta_frontend:latest
             ghcr.io/${{ github.repository_owner }}/eta_frontend:${{ github.sha }}
+
+            
