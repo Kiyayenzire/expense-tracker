@@ -29,8 +29,8 @@ jobs:
           file: ./eta_backend/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/eta_backend:latest
-            ghcr.io/${{ github.repository_owner }}/eta_backend:${{ github.sha }}
+            ghcr.io/kiyayenzire/eta_backend:latest
+            ghcr.io/kiyayenzire/eta_backend:${{ github.sha }}
 
       - name: Build and push frontend image
         uses: docker/build-push-action@v5
@@ -39,8 +39,8 @@ jobs:
           file: ./eta_frontend/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/eta_frontend:latest
-            ghcr.io/${{ github.repository_owner }}/eta_frontend:${{ github.sha }}
+            ghcr.io/kiyayenzire/eta_frontend:latest
+            ghcr.io/kiyayenzire/eta_frontend:${{ github.sha }}
 
       - name: SSH and Deploy to Droplet
         uses: appleboy/ssh-action@v1.0.3
