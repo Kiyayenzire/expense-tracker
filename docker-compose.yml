@@ -1,9 +1,12 @@
+version: '3.8'
+
 services:
   db:
     image: postgres:15-alpine
+    container_name: eta_db
     restart: always
     env_file:
-      - ./.env
+      - .env
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 3s
@@ -12,9 +15,12 @@ services:
       start_period: 20s
     volumes:
       - db_data:/var/lib/postgresql/data
+    networks:
+      - internal_network
 
   redis:
     image: redis:7-alpine
+    container_name: eta_redis
     restart: always
     healthcheck:
       test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
@@ -23,12 +29,15 @@ services:
       retries: 5
     volumes:
       - redis_data:/data
+    networks:
+      - internal_network
 
   backend:
-    image: ${BACKEND_IMAGE:-ghcr.io/kiyayenzire/expense-tracker-backend:latest}
+    image: ghcr.io/kiyayenzire/eta_backend:latest
+    container_name: eta_backend
     restart: always
     env_file:
-      - ./.env
+      - .env
     volumes:
       - staticfiles:/app/staticfiles
       - media_data:/app/media
@@ -37,50 +46,54 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - internal_network
+      - web_network
 
   celery_worker:
-    image: ${BACKEND_IMAGE:-ghcr.io/kiyayenzire/expense-tracker-backend:latest}
+    image: ghcr.io/kiyayenzire/eta_backend:latest
+    container_name: eta_celery_worker
     restart: always
     command: celery -A backend worker --loglevel=info
     env_file:
-      - ./.env
+      - .env
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - internal_network
 
   celery_beat:
-    image: ${BACKEND_IMAGE:-ghcr.io/kiyayenzire/expense-tracker-backend:latest}
+    image: ghcr.io/kiyayenzire/eta_backend:latest
+    container_name: eta_celery_beat
     restart: always
     command: celery -A backend beat --loglevel=info
     env_file:
-      - ./.env
+      - .env
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - internal_network
 
   frontend:
-    image: ${FRONTEND_IMAGE:-ghcr.io/kiyayenzire/expense-tracker-frontend:latest}
+    image: ghcr.io/kiyayenzire/eta_frontend:latest
+    container_name: eta_frontend
     restart: always
     depends_on:
       - backend
+    networks:
+      - web_network
 
-  webserver:
-    image: nginx:stable-alpine
-    restart: always
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
-      - staticfiles:/app/staticfiles:ro
-      - media_data:/app/media:ro
-    depends_on:
-      - backend
-      - frontend
+networks:
+  internal_network:
+    driver: bridge
+  web_network:
+    external: true
 
 volumes:
   db_data:

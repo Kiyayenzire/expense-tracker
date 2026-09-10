@@ -7,8 +7,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/expense-tracker-backend
-  FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/expense-tracker-frontend
+  BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/eta_backend
+  FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/eta_frontend
 
 jobs:
   build-and-push:
@@ -45,6 +45,9 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
 
     steps:
       - name: SSH and Deploy to Droplet
@@ -54,8 +57,8 @@ jobs:
           username: ${{ secrets.DROPLET_USER }}
           key: ${{ secrets.DROPLET_SSH_KEY }}
           script: |
-            cd /var/www/expense-tracker
+            cd /home/deploy/expense-tracker
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker compose --env-file .env pull
-            docker compose --env-file .env up -d --remove-orphans
+            docker compose -f docker-compose.prod.yml --env-file .env pull
+            docker compose -f docker-compose.prod.yml --env-file .env up -d --remove-orphans
             docker image prune -f
