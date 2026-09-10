@@ -40,6 +40,9 @@ if isinstance(raw_hosts, str):
 else:
     ALLOWED_HOSTS = raw_hosts
 
+if not ALLOWED_HOSTS or ALLOWED_HOSTS == ['*']:
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+
 # ============================================================================== 
 # 2. DJANGO APPLICATIONS AND MIDDLEWARE
 # ============================================================================== 

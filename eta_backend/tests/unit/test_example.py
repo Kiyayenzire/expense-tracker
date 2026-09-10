@@ -254,22 +254,22 @@ class TestExpensePredictionService:
     """Tests for ExpensePredictor service."""
     
     def test_predict_with_no_data(self, test_user):
-        """Test prediction returns empty dict when user has no expenses."""
+        """Test prediction returns an empty structured result without expenses."""
         predictor = ExpensePredictor(test_user)
         predictions = predictor.predict_next_month()
-        assert predictions == {}
+        assert predictions == {'predictions': {}, 'high_volume_categories': []}
     
     def test_predict_with_single_category(self, multiple_expenses, test_user):
         """Test prediction with single category."""
         predictor = ExpensePredictor(test_user)
         predictions = predictor.predict_next_month()
-        assert len(predictions) > 0
+        assert len(predictions['predictions']) > 0
     
     def test_predict_returns_positive_values(self, multiple_expenses, test_user):
         """Test that predictions are positive values."""
         predictor = ExpensePredictor(test_user)
         predictions = predictor.predict_next_month()
-        for category, amount in predictions.items():
+        for category, amount in predictions['predictions'].items():
             assert amount >= 0
 
 
