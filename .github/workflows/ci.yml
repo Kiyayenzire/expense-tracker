@@ -13,19 +13,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.14
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.14'
+          python-version: '3.11'
 
       - name: Install backend dependencies
-        working-directory: backend
+        working-directory: eta_backend
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements/dev.txt
 
       - name: Run backend tests
-        working-directory: backend
+        working-directory: eta_backend
         run: |
           python -m pytest -q
 
@@ -35,11 +35,11 @@ jobs:
           node-version: '20'
 
       - name: Install frontend dependencies
-        working-directory: frontend
+        working-directory: eta_frontend
         run: npm ci
 
       - name: Build frontend
-        working-directory: frontend
+        working-directory: eta_frontend
         run: npm run build
 
   publish:
@@ -65,19 +65,19 @@ jobs:
       - name: Build and push backend image
         uses: docker/build-push-action@v5
         with:
-          context: ./backend
-          file: ./backend/Dockerfile
+          context: ./eta_backend
+          file: ./eta_backend/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/expense-tracker-backend:latest
-            ghcr.io/${{ github.repository_owner }}/expense-tracker-backend:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/eta_backend:latest
+            ghcr.io/${{ github.repository_owner }}/eta_backend:${{ github.sha }}
 
       - name: Build and push frontend image
         uses: docker/build-push-action@v5
         with:
-          context: ./frontend
-          file: ./frontend/Dockerfile
+          context: ./eta_frontend
+          file: ./eta_frontend/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/expense-tracker-frontend:latest
-            ghcr.io/${{ github.repository_owner }}/expense-tracker-frontend:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/eta_frontend:latest
+            ghcr.io/${{ github.repository_owner }}/eta_frontend:${{ github.sha }}
