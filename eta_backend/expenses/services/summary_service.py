@@ -7,7 +7,7 @@ from decimal import Decimal
 from django.db.models import Sum, QuerySet
 from accounts.models import User
 from .currency_service import CurrencyService
-from ..models import ExpenseEntry
+from ..models import Category, ExpenseEntry
 
 
 class SummaryService:
@@ -24,8 +24,9 @@ class SummaryService:
         """Calculate total from a queryset with currency conversion."""
         total = Decimal('0.00')
         for expense in queryset.select_related('currency'):
+            line_total = expense.amount * (expense.quantity or Decimal('1.00'))
             converted_amount = CurrencyService.convert_amount(
-                expense.amount,
+                line_total,
                 expense.currency.code,
                 target_currency,
                 expense.date
@@ -47,6 +48,14 @@ class SummaryService:
             target_date = date.today()
         
         queryset = self._get_user_expenses().filter(date=target_date)
+        return self._calculate_total(queryset, target_currency)
+
+    def get_range_summary(self, start_date: date, end_date: date, target_currency: str = 'EUR') -> Decimal:
+        """Get the converted total for an inclusive date range."""
+        queryset = self._get_user_expenses().filter(
+            date__gte=start_date,
+            date__lte=end_date,
+        )
         return self._calculate_total(queryset, target_currency)
     
     def get_weekly_summary(self, target_date: date = None, target_currency: str = 'EUR') -> Decimal:
@@ -165,6 +174,11 @@ class SummaryService:
         """
         queryset = self._get_user_expenses().filter(date__year=year)
         return self._calculate_total(queryset, target_currency)
+
+    def get_latest_expense_year(self) -> int:
+        """Return the most recent year that has any expense for the user."""
+        latest_expense = self._get_user_expenses().order_by('-date').values_list('date', flat=True).first()
+        return latest_expense.year if latest_expense else date.today().year
     
     def get_yearly_by_month(self, year: int, target_currency: str = 'EUR') -> dict:
         """
@@ -181,8 +195,9 @@ class SummaryService:
         queryset = self._get_user_expenses().filter(date__year=year).select_related('currency')
 
         for expense in queryset:
+            line_total = expense.amount * (expense.quantity or Decimal('1.00'))
             converted_amount = CurrencyService.convert_amount(
-                expense.amount,
+                line_total,
                 expense.currency.code,
                 target_currency,
                 expense.date
@@ -191,3 +206,34 @@ class SummaryService:
             monthly_totals[month] = monthly_totals.get(month, Decimal('0.00')) + converted_amount
 
         return {month: total for month, total in sorted(monthly_totals.items())}
+
+    def get_yearly_by_category(self, year: int | None = None, target_currency: str = 'EUR') -> list:
+        """Return converted expense totals for every category in a year.
+
+        If no year is provided, use the most recent year that contains user expenses.
+        This keeps back-dated entries visible when they are the newest relevant data.
+        """
+        if year is None:
+            year = self.get_latest_expense_year()
+
+        totals = {
+            category.id: {
+                'category': category.name,
+                'color': category.color,
+                'total': Decimal('0.00'),
+            }
+            for category in Category.objects.filter(is_active=True)
+        }
+        queryset = self._get_user_expenses().filter(date__year=year).select_related('category', 'currency')
+
+        for expense in queryset:
+            total_amount = expense.amount * (expense.quantity or Decimal('1.00'))
+            converted_amount = CurrencyService.convert_amount(
+                total_amount,
+                expense.currency.code,
+                target_currency,
+                expense.date,
+            ) or Decimal('0.00')
+            totals[expense.category_id]['total'] += converted_amount
+
+        return sorted(totals.values(), key=lambda item: item['total'], reverse=True)

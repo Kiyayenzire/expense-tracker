@@ -1,263 +1,170 @@
 # ETA Expense Tracker - Deployment Guide
 
-## Project Status: ✅ PRODUCTION READY
+This guide reflects the project as it exists in this repository today. The active local stack is driven by `docker-compose.yml` with development overrides from `docker-compose.override.yml`, and the default admin path is configured through the `DJANGO_ADMIN_URL` setting in `.env.dev`.
 
-**Test Results**: 91/91 tests passing (100%)
-- Unit tests: 44 tests ✅
-- Integration tests: 24 tests ✅  
-- E2E tests: 9 tests ✅
+## Deployment summary
 
-## Table of Contents
-1. [Quick Start](#quick-start)
-2. [Local Development with Docker](#local-development-with-docker)
-3. [Production Deployment](#production-deployment)
-4. [DigitalOcean Deployment](#digitalocean-deployment)
-5. [Monitoring and Maintenance](#monitoring-and-maintenance)
+- Local app: http://localhost:5173
+- Django API: http://localhost:8000/api
+- Admin route: http://127.0.0.1:8000/etaalthech2026/
+- Database: PostgreSQL inside Docker
+- Cache/Broker: Redis inside Docker
+- Background jobs: Celery worker + Celery beat
+- Production reverse proxy: nginx config in `nginx/nginx.prod.conf`
 
----
+## Prerequisites
 
-## Quick Start
-
-### Prerequisites
-- Docker & Docker Compose installed
+- Docker and Docker Compose installed
 - Git
-- Free API key from exchangerate.host (or Fixer.io for premium rates)
+- A valid `.env.dev` file in the project root for local development
+- Production environment values in `.env` or a secure production env file for deployment
 
-### Start Development Environment
+## Local development
+
+### Start the stack
+
 ```bash
-# Clone the repository
-git clone <your-repo>
-cd eta
-
-# Copy environment files
-cp .env.dev .env
-# Update .env with your settings if needed
-
-# Start all services
-docker compose -f docker-compose.dev.yml up --build
-
-# Backend available at: http://localhost:8000/api/
-# Frontend available at: http://localhost:5173/
+docker compose --env-file .env.dev up -d --build
 ```
 
-### Default Login Credentials (Development Only)
-```
-Email: admin@example.com
-Password: admin123
-```
+This will bring up:
 
----
+- `db`
+- `redis`
+- `backend`
+- `celery_worker`
+- `celery_beat`
+- `frontend`
 
-## Local Development with Docker
+### Open the app
 
-### Start Services
+- Frontend: http://localhost:5173
+- API: http://localhost:8000/api
+- Admin: http://127.0.0.1:8000/etaalthech2026/
+
+### Create a superuser
+
 ```bash
-docker compose -f docker-compose.dev.yml up --build
+docker compose --env-file .env.dev exec backend python manage.py createsuperuser
 ```
 
-### Services Running
-- **Backend**: Django on port 8000 (http://localhost:8000)
-- **Frontend**: Vite React on port 5173 (http://localhost:5173)
-- **Database**: PostgreSQL on port 5432
-- **Redis**: Cache/Celery broker on port 6379
-- **Celery Worker**: Background tasks
-- **Celery Beat**: Scheduled tasks (currency rate updates every Monday 17:00 UTC)
+### Run migrations
 
-### View Logs
 ```bash
-# All services
-docker compose -f docker-compose.dev.yml logs -f
-
-# Specific service
-docker compose -f docker-compose.dev.yml logs -f backend
-docker compose -f docker-compose.dev.yml logs -f celery_worker
+docker compose --env-file .env.dev exec backend python manage.py migrate
 ```
 
-### Run Tests
+### View logs
+
 ```bash
-# Inside backend container
-docker compose -f docker-compose.dev.yml exec backend pytest tests/ -v
-
-# Or locally if Python is installed
-cd backend
-pytest tests/ -v
+docker compose --env-file .env.dev logs -f backend
+docker compose --env-file .env.dev logs -f frontend
+docker compose --env-file .env.dev logs -f celery_worker
 ```
 
-### Database Operations
+## Production deployment
+
+The repository is designed to run with the root Compose file and an environment file. For production, set up a secure `.env` or `.env.prod` file before starting the stack.
+
 ```bash
-# Create superuser
-docker compose -f docker-compose.dev.yml exec backend python manage.py createsuperuser
-
-# Run migrations
-docker compose -f docker-compose.dev.yml exec backend python manage.py migrate
-
-# Django shell
-docker compose -f docker-compose.dev.yml exec backend python manage.py shell
+docker compose --env-file .env up -d --build
 ```
 
----
+The app is also configured to work behind Nginx. The reverse proxy file is in `nginx/nginx.prod.conf`.
 
-## Production Deployment
+## Environment variables
 
-### Pre-Deployment Checklist
-- [ ] All tests passing (run `pytest tests/ -v`)
-- [ ] Environment variables configured in `.env.prod`
-- [ ] SSL certificates obtained
-- [ ] Domain name purchased and DNS configured
-- [ ] Backup strategy in place
-- [ ] Monitoring and logging setup
+The project reads from the root `.env` file when present, and falls back to `.env.dev` when needed. The default development settings already contain:
 
-### Production Environment Variables
-Create `.env.prod` with:
 ```env
-# Django
-DJANGO_SECRET_KEY=<generate-with: python -c "import secrets; print(secrets.token_urlsafe(50))">
-DJANGO_DEBUG=False
-DJANGO_ALLOWED_HOSTS=yourdomain.com,www.yourdomain.com
-DJANGO_CSRF_TRUSTED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
-
-# Database
-DATABASE_URL=postgresql://etauser:securepassword@db:5432/eta_prod
-
-# Redis
+DJANGO_SECRET_KEY=dev-secret-key-change-in-production-12345
+DEBUG=True
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,backend,0.0.0.0
+DJANGO_ADMIN_URL=etaalthech2026
+DATABASE_URL=postgres://expense_tracker_dev_user:expense_tracker_dev_password@db:5432/expense_tracker_dev
 REDIS_URL=redis://redis:6379/0
-
-# Celery
-CELERY_BROKER_URL=redis://redis:6379/1
-CELERY_RESULT_BACKEND=redis://redis:6379/2
-
-# Currency API
-FIXER_API_KEY=your_fixer_api_key_here
-
-# Frontend
-VITE_API_URL=https://yourdomain.com/api
+FIXER_API_KEY=your-fixer-api-key
+DEFAULT_CURRENCY=EUR
+FRONTEND_URL=http://localhost:5173
 ```
 
-### Build Production Images
+For production, replace the dev values with secure credentials and a real secret key.
+
+## Test runs
+
+### Backend
+
 ```bash
-# Build backend
-docker build -f backend/Dockerfile -t yourusername/eta-backend:latest backend/
-
-# Build frontend
-docker build -f frontend/Dockerfile -t yourusername/eta-frontend:latest frontend/
-
-# Push to Docker registry (if using GHCR)
-docker tag yourusername/eta-backend:latest ghcr.io/yourusername/eta-backend:latest
-docker tag yourusername/eta-frontend:latest ghcr.io/yourusername/eta-frontend:latest
-
-docker push ghcr.io/yourusername/eta-backend:latest
-docker push ghcr.io/yourusername/eta-frontend:latest
+docker compose --env-file .env.dev exec backend pytest -q
 ```
 
-### Start Production Services
+### Frontend
+
 ```bash
-# Load production environment
-export $(cat .env.prod | xargs)
-
-# Start with production compose file
-docker compose -f docker-compose.prod.yml up -d
-
-# View status
-docker compose -f docker-compose.prod.yml ps
+cd eta_frontend
+npm test
 ```
 
----
+### Browser tests
 
-## DigitalOcean Deployment
-
-### Option 1: Using DigitalOcean App Platform (Recommended for Beginners)
-
-#### Step 1: Push Docker Images to GHCR
 ```bash
-# Authenticate with GitHub Container Registry
-docker login ghcr.io
-
-# Build and push images
-docker build -f backend/Dockerfile -t ghcr.io/yourusername/eta-backend:latest backend/
-docker build -f frontend/Dockerfile -t ghcr.io/yourusername/eta-frontend:latest frontend/
-
-docker push ghcr.io/yourusername/eta-backend:latest
-docker push ghcr.io/yourusername/eta-frontend:latest
+cd eta_frontend
+npm run test:e2e
 ```
 
-#### Step 2: Create DigitalOcean App
-1. Go to [DigitalOcean Dashboard](https://cloud.digitalocean.com)
-2. Click "Create" → "Apps"
-3. Connect your GitHub repository
-4. Create `app.yaml` in repository root:
+## Troubleshooting
 
-```yaml
-name: eta-expense-tracker
-services:
-- name: backend
-  github:
-    repo: yourusername/eta
-    branch: main
-  build_command: npm install --prefix frontend && npm run build --prefix frontend
-  http_port: 8000
-  run_command: gunicorn backend.wsgi:application --bind 0.0.0.0:8000
-  envs:
-  - key: DJANGO_SETTINGS_MODULE
-    value: backend.settings
-  - key: DEBUG
-    value: "False"
-  - key: ALLOWED_HOSTS
-    value: eta.ondigitalocean.app
-  source_dir: backend
+### Frontend is not loading
 
-- name: frontend
-  github:
-    repo: yourusername/eta
-    branch: main
-  build_command: npm install && npm run build
-  http_port: 3000
-  source_dir: frontend
+Check the service status:
 
-databases:
-- name: postgres-db
-  engine: PG
-  version: "15"
-
-- name: redis-cache
-  engine: REDIS
-  version: "7"
-```
-
-5. Set environment variables in App Platform
-6. Deploy!
-
-### Option 2: Using DigitalOcean Droplet (More Control)
-
-#### Step 1: Create Droplet
-1. Go to DigitalOcean → Droplets → Create Droplet
-2. Select Ubuntu 22.04 LTS
-3. Choose size: $12-24/month minimum (2GB RAM)
-4. Select region closest to users
-5. Add SSH key
-
-#### Step 2: Configure Droplet
 ```bash
-# SSH into droplet
-ssh root@your_droplet_ip
+docker compose --env-file .env.dev ps
+```
 
-# Update system
-apt update && apt upgrade -y
+Check logs for both frontend and backend:
 
-# Install Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sh get-docker.sh
+```bash
+docker compose --env-file .env.dev logs -f frontend backend
+```
 
-# Install Docker Compose
-curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose
+### Database or migration issues
 
-# Install Nginx
-apt install nginx -y
+```bash
+docker compose --env-file .env.dev exec backend python manage.py check
+docker compose --env-file .env.dev exec backend python manage.py migrate
+```
 
-# Clone repository
-cd /root
-git clone https://github.com/yourusername/eta.git
-cd eta
+### Reset the local environment
+
+```bash
+docker compose --env-file .env.dev down -v
+```
+
+Then restart:
+
+```bash
+docker compose --env-file .env.dev up -d --build
+```
+
+## Notes
+
+- The project intentionally does not include a payment feature.
+- Expense data is user-scoped; accounts should not see each other’s records.
+- The profile system supports profile photos and monthly income fields.
+- Report filenames use a human-readable period name, such as `september` rather than `9`.
+- The custom admin route is not the default `/admin/` path in this workspace.
+
+## Useful references
+
+- [README.md](README.md)
+- [QUICK_REFERENCE.md](QUICK_REFERENCE.md)
+- [docker-compose.yml](docker-compose.yml)
+- [docker-compose.override.yml](docker-compose.override.yml)
+- [docker-compose.test.yml](docker-compose.test.yml)
+- [eta_backend/backend/settings.py](eta_backend/backend/settings.py)
+
+
 
 # Copy production environment
 cp .env.prod.example .env.prod

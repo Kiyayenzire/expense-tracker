@@ -8,8 +8,8 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 app.autodiscover_tasks()
 
 app.conf.beat_schedule = {
-    'update-currency-rates-every-monday-17': {
+    'update-currency-rates-every-monday-12': {
         'task': 'expenses.tasks.update_currency_rates',
-        'schedule': crontab(hour=17, minute=0, day_of_week='mon'),
+        'schedule': crontab(hour=12, minute=0, day_of_week='mon'),
     },
 }

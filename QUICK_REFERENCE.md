@@ -1,223 +1,121 @@
-# ETA Expense Tracker - Quick Reference Guide
+# ETA Expense Tracker - Quick Reference
 
-## ⚡ Super Quick Start (5 Minutes)
+## Start the app
 
 ```bash
-# 1. Start everything
-docker compose -f docker-compose.dev.yml up --build
-
-# 2. Open browser
-# Frontend: http://localhost:5173
-# Backend API: http://localhost:8000/api/
-
-# 3. Create admin user (in another terminal)
-docker compose exec backend python manage.py createsuperuser
-
-# 4. Login at http://localhost:5173
-# Use admin credentials you just created
+docker compose --env-file .env.dev up -d --build
 ```
 
----
+Open:
 
-## 🔧 Common Development Commands
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:8000/api
+- Admin: http://127.0.0.1:8000/etaalthech2026/
 
-### Running Tests
+## Common commands
+
+### Create a superuser
+
 ```bash
-# All tests
-docker compose exec backend pytest tests/ -v
-
-# Just unit tests
-docker compose exec backend pytest tests/unit/ -v
-
-# Just integration tests
-docker compose exec backend pytest tests/integration/ -v
-
-# Just e2e tests
-docker compose exec backend pytest tests/e2e/ -v
-
-# Specific test file
-docker compose exec backend pytest tests/unit/test_services.py -v
-
-# Specific test
-docker compose exec backend pytest tests/unit/test_services.py::TestCurrencyService -v
-
-# With coverage
-docker compose exec backend pytest tests/ --cov=expenses
+docker compose --env-file .env.dev exec backend python manage.py createsuperuser
 ```
 
-### Database Operations
+### Run migrations
+
 ```bash
-# Create migrations
-docker compose exec backend python manage.py makemigrations
-
-# Apply migrations
-docker compose exec backend python manage.py migrate
-
-# Reset database (⚠️ DELETES ALL DATA)
-docker compose exec backend python manage.py flush
-
-# Django shell
-docker compose exec backend python manage.py shell
-
-# Dump data
-docker compose exec backend python manage.py dumpdata > backup.json
-
-# Load data
-docker compose exec backend python manage.py loaddata backup.json
-
-# Create sample data
-docker compose exec backend python manage.py seed_data
+docker compose --env-file .env.dev exec backend python manage.py migrate
 ```
 
-### Backend Development
+### Run backend tests
+
 ```bash
-# View logs
-docker compose logs -f backend
-
-# Rebuild backend image
-docker compose build backend
-
-# Restart backend service
-docker compose restart backend
-
-# Run linting
-docker compose exec backend flake8 expenses/
-
-# Format code
-docker compose exec backend black expenses/
-
-# Type checking
-docker compose exec backend mypy expenses/
+docker compose --env-file .env.dev exec backend pytest -q
 ```
 
-### Frontend Development
+Targeted test groups:
+
 ```bash
-# View logs
-docker compose logs -f frontend
-
-# Rebuild frontend image
-docker compose build frontend
-
-# Restart frontend service
-docker compose restart frontend
-
-# Access Vite dev server
-# Already running at http://localhost:5173
+docker compose --env-file .env.dev exec backend pytest tests/unit -q
+docker compose --env-file .env.dev exec backend pytest tests/integration -q
+docker compose --env-file .env.dev exec backend pytest tests/e2e -q
 ```
 
-### Database Inspection
+### Run frontend tests
+
 ```bash
-# Connect to PostgreSQL
-docker compose exec db psql -U etauser -d eta
-
-# SQL Commands inside psql:
-# \l              - List all databases
-# \d              - List all tables
-# SELECT * FROM expenses_expenseentry;
-# \q              - Quit
-
-# Or connect directly
-docker compose exec db psql -U etauser -d eta -c "SELECT COUNT(*) FROM expenses_expenseentry;"
+cd eta_frontend
+npm test
 ```
 
-### Redis Operations
+### View logs
+
 ```bash
-# Connect to Redis
-docker compose exec redis redis-cli
-
-# Commands:
-# PING              - Test connection
-# KEYS *            - List all keys
-# GET key_name      - Get value
-# FLUSHDB          - Clear database (⚠️)
-# INFO             - Server info
+docker compose --env-file .env.dev logs -f backend
+docker compose --env-file .env.dev logs -f frontend
+docker compose --env-file .env.dev logs -f celery_worker
 ```
 
-### Celery Operations
+### Restart services
+
 ```bash
-# View Celery logs
-docker compose logs -f celery_worker
-
-# View Celery Beat logs
-docker compose logs -f celery_beat
-
-# Check Celery tasks status
-docker compose exec backend python manage.py shell
->>> from celery.app.control import Inspect
->>> inspect = Inspect()
->>> inspect.active()  # Active tasks
->>> inspect.scheduled()  # Scheduled tasks
-
-# Manually trigger currency rate update
-docker compose exec backend python manage.py shell
->>> from expenses.tasks import update_currency_rates
->>> update_currency_rates.delay()
+docker compose --env-file .env.dev restart backend
+docker compose --env-file .env.dev restart frontend
 ```
 
----
+### Stop the stack
 
-## 📁 File Locations
+```bash
+docker compose --env-file .env.dev down
+```
 
-### Important Files
-| File | Purpose |
-|------|---------|
-| `backend/expenses/services/` | Core business logic |
-| `backend/expenses/views.py` | API endpoints |
-| `backend/expenses/models.py` | Database models |
-| `frontend/src/components/Dashboard.jsx` | Main UI component |
-| `docker-compose.dev.yml` | Development setup |
-| `docker-compose.prod.yml` | Production setup |
-| `backend/requirements/base.txt` | Python dependencies |
-| `frontend/package.json` | Node dependencies |
+### Reset the stack completely
 
----
+```bash
+docker compose --env-file .env.dev down -v
+```
 
-## 🐛 Debugging Tips
+## Important project paths
 
-### Backend Debugging
+- `eta_backend/` — Django backend
+- `eta_backend/accounts/` — user profiles and auth logic
+- `eta_backend/expenses/` — expense logic, reports, predictions, insights
+- `eta_frontend/src/` — React app source
+- `docker-compose.yml` — main stack
+- `docker-compose.override.yml` — dev overrides
+- `docker-compose.test.yml` — test-only stack
+- `.env.dev` — default local env settings
+- `nginx/nginx.prod.conf` — production proxy config
+
+## Useful Django shell snippets
+
+```bash
+docker compose --env-file .env.dev exec backend python manage.py shell
+```
+
 ```python
-# In Django shell
-docker compose exec backend python manage.py shell
-
-# Import models
-from expenses.models import ExpenseEntry, Category
 from accounts.models import User
+from expenses.models import ExpenseEntry
 
-# Query data
 user = User.objects.first()
 expenses = ExpenseEntry.objects.filter(user=user)
-
-# Test services
-from expenses.services.currency_service import CurrencyService
-rate = CurrencyService.get_latest_rate('EUR', 'USD')
-
-from expenses.services.summary_service import SummaryService
-summary = SummaryService(user).get_daily_summary()
+print(expenses.count())
 ```
 
-### Frontend Debugging
-```javascript
-// Browser console (F12)
-fetch('/api/expenses/', {
-  headers: {'Authorization': 'Token YOUR_TOKEN'}
-})
-.then(r => r.json())
-.then(d => console.log(d))
+## Useful frontend checks
 
-// Check local storage
-localStorage.getItem('token')
-localStorage.getItem('user')
-```
-
-### Docker Debugging
 ```bash
-# View all running containers
-docker ps
+cd eta_frontend
+npm run build
+```
 
-# View all containers (including stopped)
-docker ps -a
+## Notes
 
-# View container logs
+- The current app uses `DJANGO_ADMIN_URL=etaalthech2026`.
+- Profile photos are optional and stored under the user media directory.
+- Monthly income is stored on each user for budgeting recommendations.
+- Payment functionality is not part of the current codebase.
+
+
 docker compose logs backend
 
 # Follow logs in real-time

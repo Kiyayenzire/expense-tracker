@@ -1,223 +1,71 @@
-# 🚀 ETA EXPENSE TRACKER - START HERE
+# ETA Expense Tracker - Start Here
 
-## ✅ PROJECT COMPLETE & PRODUCTION READY
+This is the current project entry point for the ETA expense tracker. Use the files in this repository together with the Docker stack and the actual runtime setup in this workspace.
 
-**Status**: ALL 91 TESTS PASSING ✅  
-**Date**: July 22, 2026  
-**Ready for**: Immediate Production Deployment
+## What this project contains
 
----
+- Django backend with a custom user model, profile support, and expense APIs
+- React frontend served from Vite on port 5173
+- PostgreSQL database and Redis/Celery background services
+- Spending insights, predictions, report exports, and profile editing
+- Custom admin path configured as `etaalthech2026`
 
-## 📚 Documentation Guide
+## Recommended reading order
 
-Read these files in this order:
+1. [README.md](README.md) — full project overview and setup
+2. [QUICK_REFERENCE.md](QUICK_REFERENCE.md) — common commands and troubleshooting
+3. [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) — deployment and environment setup
+4. [PROJECT_COMPLETION_SUMMARY.md](PROJECT_COMPLETION_SUMMARY.md) — feature summary
+5. [DELIVERABLES_CHECKLIST.md](DELIVERABLES_CHECKLIST.md) — feature checklist
 
-### 1️⃣ **START HERE** (You are here)
-This file explains what's included and how to navigate the project.
-
-### 2️⃣ **QUICK_REFERENCE.md** ⚡ (5-minute read)
-**For**: Developers starting work  
-**Contains**: Quick commands, common tasks, debugging tips
-
-### 3️⃣ **PROJECT_COMPLETION_SUMMARY.md** 📊 (10-minute read)
-**For**: Understanding project scope  
-**Contains**: What's implemented, architecture overview, features
-
-### 4️⃣ **DEPLOYMENT_GUIDE.md** 🚀 (15-minute read)
-**For**: DevOps/deployment engineers  
-**Contains**: Step-by-step production deployment to DigitalOcean
-
-### 5️⃣ **README.md** 📖 (Complete reference)
-**For**: Full project documentation  
-**Contains**: Installation, usage, architecture, troubleshooting
-
-### 6️⃣ **DELIVERABLES_CHECKLIST.md** ✅ (Reference)
-**For**: Verifying what's included  
-**Contains**: Complete feature matrix, file structure
-
----
-
-## ⚡ Quick Start (2 Minutes)
+## Start the app
 
 ```bash
-# Start everything with Docker
-docker compose -f docker-compose.dev.yml up --build
-
-# Open browser
-# Frontend: http://localhost:5173
-# Backend: http://localhost:8000/api/
-
-# Create admin user
-docker compose exec backend python manage.py createsuperuser
-
-# Run all tests
-docker compose exec backend pytest tests/ -v
-# Result: 91 passed ✅
+docker compose --env-file .env.dev up -d --build
 ```
 
----
+Then open:
 
-## 📦 What You Have
+- Frontend: http://localhost:5173
+- API: http://localhost:8000/api
+- Admin: http://127.0.0.1:8000/etaalthech2026/
 
-### ✅ Production-Ready Backend
-- Django + Django REST Framework
-- 6 intelligent services (currency, summaries, predictions, anomalies, expenses, reports)
-- 23 API endpoints
-- Celery background jobs (weekly currency updates Monday 17:00 UTC)
-- Redis caching
-- PostgreSQL database
-- Complete user authentication
+## Create a user
 
-### ✅ Modern Frontend
-- React with Vite (fast bundler)
-- Beautiful dashboard UI
-- Light/dark mode toggle
-- Expense tracking interface
-- Report generation
-- CSV/PDF export
-- Responsive design
-
-### ✅ Advanced Features
-- **Multi-Currency**: EUR, USD, UGX with automatic weekly rate updates
-- **Predictive Spending**: ML model predicts next month's expenses
-- **Anomaly Detection**: Flags unusual spending patterns
-- **Smart Reports**: Daily/weekly/monthly/quarterly/annual summaries
-- **Historical Accuracy**: Old expenses maintain their original currency rates
-
-### ✅ Complete Testing
-- 91 tests (unit/integration/e2e)
-- 100% pass rate
-- All critical paths covered
-
-### ✅ Production Deployment
-- Docker containerization (100%)
-- Nginx reverse proxy
-- SSL/TLS ready
-- CI/CD pipeline (GitHub Actions)
-- DigitalOcean deployment guide included
-
----
-
-## 🎯 Your Next Steps
-
-### Development Team
-1. Read: `QUICK_REFERENCE.md`
-2. Run: `docker compose -f docker-compose.dev.yml up --build`
-3. Code: Make your changes
-4. Test: `pytest tests/ -v`
-
-### DevOps/Deployment Team
-1. Read: `DEPLOYMENT_GUIDE.md`
-2. Prepare: Copy `.env.prod.example` to `.env.prod`
-3. Configure: Add your secrets (database, API keys)
-4. Deploy: Follow DigitalOcean or Docker deployment steps
-5. Monitor: Use provided health check commands
-
-### Product/Business Team
-1. Read: `PROJECT_COMPLETION_SUMMARY.md`
-2. Understand: Features, API endpoints, capabilities
-3. Plan: Next phase features or mobile app development
-
----
-
-## 🔑 Key Features at a Glance
-
-| Feature | Status | Where |
-|---------|--------|-------|
-| Multi-currency tracking | ✅ | Backend: `currency_service.py` |
-| Expense entry | ✅ | Frontend: `Dashboard.jsx` |
-| Category management | ✅ | Backend: `models.py` |
-| Spending predictions | ✅ | Backend: `prediction_service.py` |
-| Anomaly detection | ✅ | Backend: `anomaly_service.py` |
-| Reports (CSV/PDF) | ✅ | Backend: `report_service.py` |
-| Dark/light mode | ✅ | Frontend: `styles.css` |
-| European dates | ✅ | Frontend + Backend config |
-| Background jobs | ✅ | Backend: `tasks.py` + Celery |
-| User authentication | ✅ | Backend: `accounts/models.py` |
-
----
-
-## 📂 Project Structure Overview
-
-```
-eta/
-├── 📁 backend/                  ← Django REST API
-│   ├── expenses/                ← Core app
-│   ├── accounts/                ← User management
-│   ├── services/                ← 6 Business logic services
-│   ├── tests/                   ← 91 tests (unit/int/e2e)
-│   └── requirements/            ← Dependencies
-├── 📁 frontend/                 ← React + Vite
-│   └── src/components/          ← Login, Dashboard
-├── 📁 nginx/                    ← Reverse proxy config
-├── 🐳 docker-compose.dev.yml   ← Development setup
-├── 🐳 docker-compose.prod.yml  ← Production setup
-├── 📄 README.md                ← Full documentation
-├── 📄 QUICK_REFERENCE.md       ← Developer cheatsheet
-├── 📄 DEPLOYMENT_GUIDE.md      ← Deployment steps
-├── 📄 PROJECT_COMPLETION_SUMMARY.md ← Feature list
-└── 📄 DELIVERABLES_CHECKLIST.md   ← Complete checklist
-```
-
----
-
-## 🧪 Testing Status
-
-```
-✅ 91/91 Tests Passing
-
-Unit Tests:        44 ✅
-Integration Tests: 24 ✅
-E2E Tests:          9 ✅
-```
-
-### Run tests with:
 ```bash
-# All tests
-docker compose exec backend pytest tests/ -v
-
-# Just unit tests
-docker compose exec backend pytest tests/unit/ -v
-
-# With coverage
-docker compose exec backend pytest tests/ --cov=expenses
+docker compose --env-file .env.dev exec backend python manage.py createsuperuser
 ```
 
----
+## Run tests
 
-## 🚀 Deployment Status
+```bash
+docker compose --env-file .env.dev exec backend pytest -q
+```
 
-| Component | Ready | How |
-|-----------|-------|-----|
-| Docker | ✅ | Build: `docker build -f backend/Dockerfile backend/` |
-| Tests | ✅ | Run: `pytest tests/ -v` |
-| Config | ✅ | Edit: `.env.prod.example` → `.env.prod` |
-| Database | ✅ | Use: PostgreSQL 15+ |
-| API | ✅ | Deploy: `docker-compose.prod.yml up` |
-| Frontend | ✅ | Deploy: Vite build included |
+Frontend tests:
 
----
+```bash
+cd eta_frontend
+npm test
+```
 
-## 💰 Cost Breakdown (Production)
+## Important notes
 
-### One-Time Costs
-- Domain name: $12/year (optional, use default domain)
-- SSL certificate: FREE (Let's Encrypt)
+- The current project uses `docker-compose.yml` and `docker-compose.override.yml` rather than older `docker-compose.dev.yml` or `docker-compose.prod.yml` references.
+- The app intentionally does not contain a payment feature.
+- User data is isolated per account.
+- Profile photos and monthly income are supported by the backend.
+- The README and deployment docs in this repo should be treated as the source of truth for the current workspace.
 
-### Monthly Costs (DigitalOcean)
-- Droplet (2GB RAM): $12
-- PostgreSQL database: $15
-- Redis cache: $6
-- CDN (optional): $5
+## Useful links
 
-**Total**: ~$38/month for production
+- [README.md](README.md)
+- [QUICK_REFERENCE.md](QUICK_REFERENCE.md)
+- [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)
+- [docker-compose.yml](docker-compose.yml)
+- [docker-compose.test.yml](docker-compose.test.yml)
 
-### Optional Premium Services
-- Fixer.io API: $10/month (premium currency rates)
-- Sentry (error tracking): $25/month
-- SendGrid (email): $10/month
 
----
 
 ## 🔒 Security
 

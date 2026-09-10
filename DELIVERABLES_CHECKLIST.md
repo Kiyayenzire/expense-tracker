@@ -1,14 +1,16 @@
-# 🎉 ETA Expense Tracker - Final Deliverables Checklist
+# ETA Expense Tracker - Deliverables Checklist
 
-## ✅ ALL COMPLETE - READY FOR PRODUCTION
+## Project status
 
-**Last Updated**: July 22, 2026  
-**Status**: PRODUCTION READY  
-**Test Coverage**: 91/91 tests passing (100%)
+This checklist reflects the current project as it exists in this repository. The implementation is complete for the active scope of the app, including the backend services, frontend experience, Docker setup, reporting tools, and user-account features already verified in this workspace.
+
+**Last updated**: September 2026  
+**Status**: ready for current development and deployment use  
+**Verification**: checked against the repository structure and the active app configuration
 
 ---
 
-## 📦 Complete Project Deliverables
+## Delivery checklist
 
 ### Backend (Django + DRF)
 ✅ **Core Application**
@@ -116,11 +118,11 @@
 
 ### Docker & DevOps
 ✅ **Containerization**
-- [x] Backend Dockerfile (multi-stage)
-- [x] Frontend Dockerfile (multi-stage)
-- [x] docker-compose.dev.yml (development)
-- [x] docker-compose.override.yml (local overrides)
-- [x] docker-compose.prod.yml (production)
+- [x] Backend Dockerfile
+- [x] Frontend Dockerfile
+- [x] docker-compose.yml (main stack)
+- [x] docker-compose.override.yml (development overrides)
+- [x] docker-compose.test.yml (test environment)
 - [x] Health checks configured
 - [x] Volume mounts configured
 - [x] Environment variable handling
@@ -132,7 +134,7 @@
 - [x] Redis cache/broker
 - [x] Celery worker
 - [x] Celery Beat scheduler
-- [x] Nginx reverse proxy (prod)
+- [x] Nginx reverse proxy config
 
 ✅ **CI/CD Pipeline**
 - [x] GitHub Actions workflow
@@ -167,7 +169,7 @@
 
 ---
 
-## 📊 Feature Implementation Matrix
+## Feature matrix
 
 | Feature | Backend | Frontend | Tests | Status |
 |---------|---------|----------|-------|--------|
@@ -192,7 +194,7 @@
 
 ---
 
-## 🗂️ Project File Structure
+## Project structure
 
 ### Backend Files
 ```
@@ -255,13 +257,13 @@ frontend/
 
 ### Docker & Config Files
 ```
-├── docker-compose.dev.yml           ✅ Development setup
-├── docker-compose.override.yml      ✅ Local overrides
-├── docker-compose.prod.yml          ✅ Production setup
-├── .env.dev                         ✅ Dev environment
-├── .env.prod.example                ✅ Prod template
+├── docker-compose.yml               ✅ Main stack
+├── docker-compose.override.yml      ✅ Development overrides
+├── docker-compose.test.yml          ✅ Test stack
+├── .env.dev                         ✅ Local environment
+├── .env                             ✅ Deployment environment
 ├── nginx/
-│   └── nginx.prod.conf              ✅ Reverse proxy
+│   └── nginx.prod.conf              ✅ Reverse proxy config
 └── .github/
     └── workflows/
         └── ci.yml                   ✅ CI/CD pipeline
@@ -273,25 +275,26 @@ frontend/
 ├── PROJECT_COMPLETION_SUMMARY.md    ✅ Feature list
 ├── DEPLOYMENT_GUIDE.md              ✅ Deployment steps
 ├── QUICK_REFERENCE.md               ✅ Developer guide
+├── 00_START_HERE.md                 ✅ Entry point
 └── This file                        ✅ Checklist
 ```
 
 ---
 
-## 🚀 How to Use These Deliverables
+## How to use these deliverables
 
 ### For Development
 1. Read: `QUICK_REFERENCE.md`
-2. Run: `docker compose -f docker-compose.dev.yml up --build`
-3. Test: `docker compose exec backend pytest tests/ -v`
-4. Code: Make changes, tests auto-run
+2. Run: `docker compose --env-file .env.dev up -d --build`
+3. Test: `docker compose --env-file .env.dev exec backend pytest -q`
+4. Code: Make changes, then verify with the relevant test set
 
 ### For Production Deployment
 1. Read: `DEPLOYMENT_GUIDE.md`
-2. Prepare: Copy `.env.prod.example` to `.env.prod`, configure
-3. Build: Run Docker build commands
-4. Deploy: Follow DigitalOcean steps
-5. Monitor: Use provided monitoring commands
+2. Prepare: create or update a secure `.env` file for deployment
+3. Build and start the stack with Docker Compose
+4. Verify the app and API endpoints
+5. Monitor logs and perform backups as needed
 
 ### For Maintenance
 1. Reference: `QUICK_REFERENCE.md`
@@ -301,7 +304,7 @@ frontend/
 
 ---
 
-## 📈 Quality Metrics
+## Quality metrics
 
 | Metric | Result | Target |
 |--------|--------|--------|
@@ -315,7 +318,7 @@ frontend/
 
 ---
 
-## 🔐 Security Checklist
+## Security checklist
 
 ✅ **Implemented**
 - [x] CSRF protection
@@ -336,7 +339,7 @@ frontend/
 
 ---
 
-## 📊 API Endpoints Summary
+## API endpoints summary
 
 **Total**: 23 endpoints
 
@@ -374,7 +377,7 @@ frontend/
 
 ---
 
-## 🎯 Next Steps After Deployment
+## Next steps after deployment
 
 ### Week 1
 - [ ] Monitor application in production
@@ -396,7 +399,7 @@ frontend/
 
 ---
 
-## 📞 Support Resources
+## Support resources
 
 ### Documentation
 - [README.md](./README.md) - Project overview
@@ -412,7 +415,7 @@ frontend/
 
 ---
 
-## ✅ Final Sign-Off
+## Final sign-off
 
 ✅ **Backend**: Complete and tested  
 ✅ **Frontend**: Complete and tested  
@@ -433,7 +436,7 @@ frontend/
 
 ---
 
-## 🎉 Congratulations!
+## Congratulations!
 
 You now have a production-ready expense tracker application with:
 - ✅ Full backend with 6 services

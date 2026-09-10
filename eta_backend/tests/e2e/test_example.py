@@ -180,6 +180,25 @@ class TestReportingWorkflow:
         insights = response.json()
         assert 'anomalies' in insights
 
+    def test_current_rates_and_monthly_report_workflow(
+        self, authenticated_client, multiple_expenses, currency_rate
+    ):
+        """Test the cached rate matrix and monthly reporting path used by the offline-aware UI."""
+        rates_response = authenticated_client.get('/api/rates/current/')
+        assert rates_response.status_code == status.HTTP_200_OK
+        rates_payload = rates_response.json()
+        assert 'rates' in rates_payload
+        assert rates_payload['rates']['EUR']['USD'] > 0
+
+        month = date.today().strftime('%Y-%m')
+        report_response = authenticated_client.get(
+            f'/api/reports/monthly/?month={month}&currency=EUR'
+        )
+        assert report_response.status_code == status.HTTP_200_OK
+        report_payload = report_response.json()
+        assert report_payload['report_currency'] == 'EUR'
+        assert 'total_amount' in report_payload
+
 
 @pytest.mark.e2e
 @pytest.mark.django_db

@@ -15,4 +15,5 @@ numpy>=1.26
 python-dotenv>=1.0
 requests>=2.34
 fpdf2>=2.7.0
+Pillow>=10.0
 whitenoise>=6.0,<7.0

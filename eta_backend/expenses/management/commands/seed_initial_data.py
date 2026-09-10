@@ -4,75 +4,76 @@ from decimal import Decimal
 from datetime import date
 
 
+CATALOG = {
+    'Housing': ['Rent', 'Mortgage', 'Construction', 'Other'],
+    'Food': ['Proteins', 'Fruits', 'Vegetables', 'Carbohydrates', 'Oils & Spices', 'Other'],
+    'Utilities': ['Electricity', 'Gas', 'Water', 'Trash Collection', 'Other'],
+    'Transport': ['Taxi', 'Train', 'Bus', 'Plane', 'Other'],
+    'Health Care': ['Drugs', 'Consultation', 'Medical care', 'Other'],
+    'Communication': ['Internet', 'Mobile Phone', 'Landline', 'Other'],
+    'Debt Payment': ['Debt Payment', 'Other'],
+    'Personal Care': ['Clothing', 'Toiletries', 'Grooming Items', 'Saloon', 'Other'],
+    'Leisure': ['Cinema', 'Paid TV', 'Vacation', 'Celebrations', 'Other'],
+    'God': ['Tithe', 'Offertory', 'Giving', 'Other'],
+    'Service (Domestic Help)': ['Service (Domestic Help)', 'Other'],
+    'School': ['Fees', 'Materials', 'Eating / Allowance', 'Other'],
+    'Gifts / Contributions': ['Cards', 'Money', 'Other'],
+    'Furniture': ['Bed', 'Mattress', 'Pillow', 'Pillow case', 'Bed cover', 'Blanket', 'Duvet', 'Other'],
+    'Electronics / Gadgets': ['Fridge', 'TV', 'Washing machine', 'Dryer', 'Phone', 'Camera', 'Laptop', 'Monitor', 'System Unit', 'Extension Cable', 'Speakers', 'Other'],
+    'Stationery': ['Book', 'Journal', 'Written book', 'Pen', 'Pencil', 'Rubber', 'Ruler', 'Sharpener', 'Other'],
+    'Utensils': ['Plates', 'Cups', 'Forks', 'Spoons', 'Knives', 'Cutting board', 'Glasses'],
+    'Other': ['Other'],
+}
+
+CATEGORY_COLORS = [
+    '#0F766E', '#2563EB', '#7C3AED', '#DB2777', '#EA580C', '#CA8A04',
+    '#16A34A', '#0891B2', '#4F46E5', '#9333EA', '#BE123C', '#0284C7',
+    '#65A30D', '#C2410C', '#475569', '#0D9488', '#1D4ED8', '#A16207',
+]
+
+MEASUREMENTS = {
+    'Rent': 'un', 'Mortgage': 'un', 'Construction': 'un',
+    'Proteins': 'kg', 'Fruits': 'kg', 'Vegetables': 'kg', 'Carbohydrates': 'kg', 'Oils & Spices': 'bt',
+    'Electricity': 'un', 'Gas': 'bt', 'Water': 'ltr', 'Trash Collection': 'un',
+    'Taxi': 'un', 'Train': 'un', 'Bus': 'un', 'Plane': 'un',
+    'Drugs': 'pc', 'Consultation': 'un', 'Medical care': 'un',
+    'Internet': 'un', 'Mobile Phone': 'un', 'Landline': 'un',
+    'Debt Payment': 'un', 'Clothing': 'pc', 'Toiletries': 'pc', 'Grooming Items': 'pc', 'Saloon': 'un',
+    'Cinema': 'un', 'Paid TV': 'un', 'Vacation': 'un', 'Celebrations': 'un',
+    'Tithe': 'un', 'Offertory': 'un', 'Giving': 'un', 'Service (Domestic Help)': 'un',
+    'Fees': 'un', 'Materials': 'pc', 'Eating / Allowance': 'un', 'Cards': 'pc', 'Money': 'un',
+    'Bed': 'pc', 'Mattress': 'pc', 'Pillow': 'pc', 'Pillow case': 'pc', 'Bed cover': 'pc', 'Blanket': 'pc', 'Duvet': 'pc',
+    'Fridge': 'un', 'TV': 'un', 'Washing machine': 'un', 'Dryer': 'un', 'Phone': 'un', 'Camera': 'un', 'Laptop': 'un', 'Monitor': 'un', 'System Unit': 'un', 'Extension Cable': 'pc', 'Speakers': 'un',
+    'Book': 'pc', 'Journal': 'pc', 'Written book': 'pc', 'Pen': 'pc', 'Pencil': 'pc', 'Rubber': 'pc', 'Ruler': 'pc', 'Sharpener': 'pc',
+    'Plates': 'pc', 'Cups': 'pc', 'Forks': 'pc', 'Spoons': 'pc', 'Knives': 'pc', 'Cutting board': 'pc', 'Glasses': 'pc',
+    'Other': 'un',
+}
+
+
 class Command(BaseCommand):
     help = 'Seed initial categories, subcategories, items, currencies, and exchange rates.'
 
     def handle(self, *args, **options):
-        categories = [
-            ('Rent', '#10B981'),
-            ('Water', '#3B82F6'),
-            ('Electricity', '#8B5CF6'),
-            ('Medical', '#EF4444'),
-            ('Vegetables', '#F97316'),
-            ('Proteins', '#F59E0B'),
-            ('Carbohydrates', '#06B6D4'),
-            ('Dairy products', '#64748B'),
-            ('Fruits', '#10B981'),
-            ('Gas', '#2563EB'),
-            ('Books', '#EC4899'),
-            ('Cinema', '#F59E0B'),
-            ('Travel', '#3B82F6'),
-            ('Gifts', '#EF4444'),
-            ('Birthdays', '#F97316'),
-            ('Parties', '#EC4899'),
-            ('School', '#14B8A6'),
-            ('School trips', '#0D9488'),
-            ('Food', '#F97316'),
-            ('Transport', '#3B82F6'),
-            ('Utilities', '#8B5CF6'),
-            ('Shopping', '#EC4899'),
-            ('Healthcare', '#EF4444'),
-            ('Entertainment', '#F59E0B'),
-            ('Education', '#06B6D4'),
-            ('Salary', '#10B981'),
-            ('Investments', '#14B8A6'),
-        ]
-
         created_categories = {}
-        for name, color in categories:
-            category, _ = Category.objects.get_or_create(name=name, defaults={'color': color, 'is_active': True})
+        for index, name in enumerate(CATALOG):
+            category, _ = Category.objects.update_or_create(
+                name=name,
+                defaults={'is_active': True, 'color': CATEGORY_COLORS[index]},
+            )
             created_categories[name] = category
 
-        proteins = created_categories.get('Proteins')
-        if proteins:
-            for name in ['Animal Proteins', 'Plant Proteins']:
-                SubCategory.objects.get_or_create(name=name, category=proteins)
+        Category.objects.exclude(name__in=CATALOG).update(is_active=False)
 
-        items = [
-            ('Monthly rent', 'Rent'),
-            ('City water bill', 'Water'),
-            ('Electric meter', 'Electricity'),
-            ('Doctor visit', 'Medical'),
-            ('Tomatoes batch', 'Vegetables'),
-            ('Chicken breast', 'Proteins'),
-            ('Beans', 'Proteins'),
-            ('Pasta', 'Carbohydrates'),
-            ('Milk pack', 'Dairy products'),
-            ('Bananas', 'Fruits'),
-            ('Cooking gas', 'Gas'),
-            ('School books', 'Books'),
-            ('Cinema tickets', 'Cinema'),
-            ('Train fare', 'Travel'),
-            ('Birthday gift', 'Gifts'),
-            ('Party catering', 'Parties'),
-            ('School fees', 'School'),
-            ('Trip allowance', 'School trips'),
-        ]
-
-        for description, category_name in items:
-            category = created_categories.get(category_name)
-            if category:
-                Item.objects.get_or_create(description=description, category=category)
+        for category_name, subcategory_names in CATALOG.items():
+            category = created_categories[category_name]
+            for subcategory_name in subcategory_names:
+                subcategory, _ = SubCategory.objects.get_or_create(name=subcategory_name, category=category)
+                Item.objects.update_or_create(
+                    description=subcategory_name,
+                    category=category,
+                    subcategory=subcategory,
+                    defaults={'measurement': MEASUREMENTS.get(subcategory_name, 'pc')},
+                )
 
         currencies = [
             ('EUR', 'Euro', '€'),

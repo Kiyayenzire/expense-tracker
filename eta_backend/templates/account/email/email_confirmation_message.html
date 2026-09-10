@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+  <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+    <h2 style="color: #2563eb;">Welcome to Expense Tracker!</h2>
+    <p>Hi {% if user.username %}{{ user.username }}{% else %}there{% endif %},</p>
+    <p>Please confirm your account by clicking the button below:</p>
+    <p style="margin: 20px 0;">
+      <a href="{{ activate_url }}" style="background-color: #2563eb; color: #ffffff; padding: 10px 18px; text-decoration: none; border-radius: 5px; display: inline-block;">
+        Verify Email Address
+      </a>
+    </p>
+    <p style="font-size: 0.875rem; color: #666;">Or copy and paste this link into your browser:<br>{{ activate_url }}</p>
+  </body>
+</html>

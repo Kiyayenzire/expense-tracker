@@ -49,6 +49,22 @@ class CurrencyService:
         if reverse_rate and reverse_rate.rate != 0:
             return float(1 / reverse_rate.rate)
 
+        # A back-dated expense may predate the first stored rate. Use the
+        # oldest available rate rather than dropping the converted total.
+        db_rate = CurrencyRate.objects.filter(
+            base_currency__code=base,
+            target_currency__code=target,
+        ).order_by('effective_date').first()
+        if db_rate:
+            return float(db_rate.rate)
+
+        reverse_rate = CurrencyRate.objects.filter(
+            base_currency__code=target,
+            target_currency__code=base,
+        ).order_by('effective_date').first()
+        if reverse_rate and reverse_rate.rate != 0:
+            return float(1 / reverse_rate.rate)
+
         external_rate = CurrencyService._fetch_from_api(base, target)
         if external_rate is not None:
             try:

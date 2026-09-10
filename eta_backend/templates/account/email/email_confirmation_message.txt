@@ -1,0 +1,11 @@
+Hello {% if user.username %}{{ user.username }}{% else %}there{% endif %},
+
+Thank you for creating an account with Expense Tracker!
+
+Please confirm your email address by visiting the following link:
+{{ activate_url }}
+
+If you did not create this account, you can safely ignore this email.
+
+Best regards,
+The Expense Tracker Team

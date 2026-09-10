@@ -62,17 +62,66 @@ class ExpenseService:
             for item in expenses
         }
     
-    def get_top_expensive_categories(self, limit: int = 5) -> list:
-        """Get the most expensive categories."""
-        return list(self.get_user_expenses().values(
-            'category__name'
-        ).annotate(total=Sum('amount')).order_by('-total')[:limit])
+    def get_top_expensive_categories(self, limit: int = 5, target_currency: str = 'EUR') -> list:
+        """Get the most expensive categories, converted to target currency."""
+        from .currency_service import CurrencyService
+        import sys
+        
+        expenses = self.get_user_expenses().values(
+            'category__name', 'currency__code', 'amount', 'quantity'
+        )
+        
+        # Group by category and convert amounts
+        category_totals = {}
+        
+        print(f"DEBUG: Converting chart to {target_currency}", file=sys.stderr)
+        for exp in expenses:
+            cat_name = exp['category__name']
+            amount = Decimal(str(exp['amount'])) * Decimal(str(exp.get('quantity') or 1))
+            currency = exp['currency__code']
+            
+            print(f"DEBUG: Processing {cat_name}: {amount} {currency}", file=sys.stderr)
+            
+            # Convert to target currency if needed
+            if currency != target_currency:
+                print(f"DEBUG: Converting {currency} -> {target_currency}", file=sys.stderr)
+                converted = CurrencyService.convert_amount(amount, currency, target_currency)
+                print(f"DEBUG: Conversion result: {converted}", file=sys.stderr)
+                amount = Decimal(str(converted)) if converted else amount
+            
+            category_totals[cat_name] = category_totals.get(cat_name, Decimal('0')) + amount
+        
+        # Sort and return top N
+        sorted_cats = sorted(category_totals.items(), key=lambda x: x[1], reverse=True)[:limit]
+        print(f"DEBUG: Final chart data: {sorted_cats}", file=sys.stderr)
+        return [{'category__name': cat, 'total': float(total)} for cat, total in sorted_cats]
     
-    def get_least_expensive_categories(self, limit: int = 3) -> list:
-        """Get the least expensive categories."""
-        return list(self.get_user_expenses().values(
-            'category__name'
-        ).annotate(total=Sum('amount')).order_by('total')[:limit])
+    def get_least_expensive_categories(self, limit: int = 3, target_currency: str = 'EUR') -> list:
+        """Get the least expensive categories, converted to target currency."""
+        from .currency_service import CurrencyService
+        
+        expenses = self.get_user_expenses().values(
+            'category__name', 'currency__code', 'amount', 'quantity'
+        )
+        
+        # Group by category and convert amounts
+        category_totals = {}
+        
+        for exp in expenses:
+            cat_name = exp['category__name']
+            amount = Decimal(str(exp['amount'])) * Decimal(str(exp.get('quantity') or 1))
+            currency = exp['currency__code']
+            
+            # Convert to target currency if needed
+            if currency != target_currency:
+                converted = CurrencyService.convert_amount(amount, currency, target_currency)
+                amount = Decimal(str(converted)) if converted else amount
+            
+            category_totals[cat_name] = category_totals.get(cat_name, Decimal('0')) + amount
+        
+        # Sort and return least N
+        sorted_cats = sorted(category_totals.items(), key=lambda x: x[1])[:limit]
+        return [{'category__name': cat, 'total': float(total)} for cat, total in sorted_cats]
     
     def update_expense(self, expense_id: int, data: dict) -> ExpenseEntry:
         """Update an existing expense entry."""

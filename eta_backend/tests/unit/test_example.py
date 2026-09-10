@@ -2,6 +2,7 @@
 import pytest
 from decimal import Decimal
 from datetime import date, timedelta
+from django.utils import timezone
 from accounts.models import User
 from expenses.models import Category, SubCategory, Item, Currency, ExpenseEntry, CurrencyRate
 from expenses.services.prediction_service import ExpensePredictor
@@ -34,6 +35,60 @@ class TestUserModel:
             two_factor_enabled=True
         )
         assert user.two_factor_enabled is True
+
+    def test_user_profile_picture_field_exists(self, db):
+        """Profile pictures should be supported on the user model."""
+        user = User.objects.create_user(
+            username='avatar_user',
+            email='avatar@example.com',
+            password='pass123'
+        )
+        assert hasattr(user, 'profile_picture')
+        assert not user.profile_picture.name
+
+    def test_profile_picture_url_uses_absolute_backend_url(self, db):
+        """Profile image URLs should point to the backend media host for the browser to render them."""
+        user = User.objects.create_user(
+            username='avatar_user_absolute',
+            email='avatar-absolute@example.com',
+            password='pass123'
+        )
+        user.profile_picture = 'profile_pictures/avatar_user_absolute/avatar.png'
+        user.save(update_fields=['profile_picture'])
+
+        serializer = __import__('accounts.serializers', fromlist=['UserProfileSerializer']).UserProfileSerializer(
+            user,
+            context={'request': type('RequestStub', (), {'build_absolute_uri': lambda self, url: f'http://localhost:8000{url}'})()}
+        )
+
+        payload = serializer.data
+        assert payload['profile_picture_url'] == 'http://localhost:8000/media/profile_pictures/avatar_user_absolute/avatar.png'
+
+    def test_user_can_request_account_deletion(self, test_user):
+        """A verified deletion request should create a pending deletion state."""
+        test_user.request_account_deletion('testpass123')
+
+        assert test_user.account_deletion_requested_at is not None
+        assert test_user.is_account_deletion_pending is True
+
+    def test_login_cancels_pending_account_deletion(self, test_user):
+        """Logging in should clear an outstanding deletion request."""
+        test_user.account_deletion_requested_at = timezone.now() - timedelta(days=2)
+        test_user.save(update_fields=['account_deletion_requested_at'])
+
+        test_user.cancel_account_deletion()
+
+        assert test_user.account_deletion_requested_at is None
+        assert test_user.is_account_deletion_pending is False
+
+    def test_expired_account_deletions_are_removed(self, test_user):
+        """Users who did not cancel in time should be deleted after 31 days."""
+        test_user.account_deletion_requested_at = timezone.now() - timedelta(days=32)
+        test_user.save(update_fields=['account_deletion_requested_at'])
+
+        deleted_count = User.objects.delete_expired_account_deletions()
+
+        assert deleted_count == 1
 
 
 @pytest.mark.unit

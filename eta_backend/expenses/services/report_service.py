@@ -26,14 +26,96 @@ class ReportService:
     def _convert_total(self, queryset, target_currency: str = 'EUR') -> Decimal:
         total = Decimal('0.00')
         for expense in queryset.select_related('currency'):
+            line_total = expense.amount * (expense.quantity or Decimal('1.00'))
             converted = CurrencyService.convert_amount(
-                expense.amount,
+                line_total,
                 expense.currency.code,
                 target_currency,
                 expense.date
             ) or Decimal('0.00')
             total += converted
         return total
+
+    def _detail_rows(self, queryset, target_currency: str = 'EUR') -> list:
+        rows = []
+        for number, expense in enumerate(queryset.select_related('category', 'subcategory', 'currency'), 1):
+            line_total = expense.amount * (expense.quantity or Decimal('1.00'))
+            converted_total = CurrencyService.convert_amount(
+                line_total, expense.currency.code, target_currency, expense.date
+            ) or Decimal('0.00')
+            rows.append({
+                'number': number,
+                'date': expense.date.isoformat(),
+                'description': expense.item_description or (expense.item.description if expense.item else expense.category.name),
+                'category': expense.category.name,
+                'subcategory': expense.subcategory.name if expense.subcategory else '',
+                'amount': Decimal(expense.amount),
+                'currency': expense.currency.code,
+                'amount_eur': line_total if expense.currency.code == 'EUR' else CurrencyService.convert_amount(line_total, expense.currency.code, 'EUR', expense.date) or Decimal('0.00'),
+                'amount_usd': CurrencyService.convert_amount(line_total, expense.currency.code, 'USD', expense.date) or Decimal('0.00'),
+                'amount_ugx': line_total if expense.currency.code == 'UGX' else CurrencyService.convert_amount(line_total, expense.currency.code, 'UGX', expense.date) or Decimal('0.00'),
+                'measurement': expense.measurement,
+                'quantity': Decimal(expense.quantity or '1.00'),
+                'total_amount': line_total,
+                'total_converted': converted_total,
+                'supplier': expense.supplier,
+                'country': expense.country,
+            })
+        return rows
+
+    def _export_rows_csv(self, title: str, period: str, queryset, target_currency: str) -> bytes:
+        rows = self._detail_rows(queryset, target_currency)
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow([title, self.user.username, period])
+        writer.writerow([])
+        writer.writerow(['No', 'Date', 'Description', 'Category', 'Subcategory', 'Amount', 'Currency EUR', 'Currency USD', 'Currency UGX', 'Measurement', 'Quantity', 'Total Amount', 'Supplier', 'Country', f'Total in {target_currency}'])
+        for row in rows:
+            writer.writerow([
+                row['number'], row['date'], row['description'], row['category'], row['subcategory'],
+                f"{row['amount']:.2f}", f"{row['amount_eur']:.2f}", f"{row['amount_usd']:.2f}", f"{row['amount_ugx']:.2f}",
+                row['measurement'], f"{row['quantity']:.2f}", f"{row['total_amount']:.2f}", row['supplier'], row['country'], f"{row['total_converted']:.2f}",
+            ])
+        writer.writerow([])
+        writer.writerow(['Total', '', '', '', '', '', '', '', '', '', '', '', '', '', f"{sum((row['total_converted'] for row in rows), Decimal('0.00')):.2f} {target_currency}"])
+        return output.getvalue().encode('utf-8')
+
+    def _export_rows_pdf(self, title: str, period: str, queryset, target_currency: str) -> bytes:
+        rows = self._detail_rows(queryset, target_currency)
+        pdf = FPDF(orientation='L', unit='mm', format='A4')
+        pdf.set_auto_page_break(auto=True, margin=10)
+        headers = ['No', 'Date', 'Description', 'Amount', 'Currency', 'Measurement', 'Quantity', 'Total Amount', 'Supplier', 'Country']
+        widths = [8, 22, 52, 18, 16, 20, 16, 24, 42, 35]
+
+        def add_header():
+            pdf.set_font('Arial', 'B', 12)
+            pdf.cell(0, 7, f'{title} - {self.user.username}', 0, 1, 'C')
+            pdf.set_font('Arial', '', 9)
+            pdf.cell(0, 6, period, 0, 1, 'C')
+            pdf.ln(2)
+            pdf.set_font('Arial', 'B', 7)
+            for header, width in zip(headers, widths):
+                pdf.cell(width, 6, header, 1, 0, 'C')
+            pdf.ln()
+
+        pdf.add_page()
+        add_header()
+        for row in rows:
+            if pdf.get_y() > 185:
+                pdf.add_page()
+                add_header()
+            values = [row['number'], row['date'], row['description'][:38], f"{row['amount']:.2f}", row['currency'], row['measurement'], f"{row['quantity']:.2f}", f"{row['total_amount']:.2f}", row['supplier'][:25], row['country'][:20]]
+            pdf.set_font('Arial', '', 7)
+            for index, (value, width) in enumerate(zip(values, widths)):
+                if index == 4 and value == row['currency']:
+                    pdf.set_font('Arial', 'B', 7)
+                pdf.cell(width, 5, str(value), 1, 0, 'L' if index in (2, 8, 9) else 'C')
+                pdf.set_font('Arial', '', 7)
+            pdf.ln()
+        pdf.set_font('Arial', 'B', 8)
+        total = sum((row['total_converted'] for row in rows), Decimal('0.00'))
+        pdf.cell(0, 7, f'Total: {total:.2f} {target_currency}', 0, 1, 'R')
+        return bytes(pdf.output(dest='S'))
     
     def generate_monthly_report(self, year: int, month: int, 
                                target_currency: str = 'EUR') -> dict:
@@ -136,6 +218,33 @@ class ReportService:
             'yearly_breakdown': {year: float(total) for year, total in sorted(yearly_breakdown.items())}
         }
 
+    def generate_custom_date_report(self, start_date: date, end_date: date, target_currency: str = 'EUR') -> dict:
+        """Generate an expense report for a custom date range."""
+        queryset = self._get_user_expenses().filter(date__gte=start_date, date__lte=end_date)
+        total = self._convert_total(queryset, target_currency)
+
+        breakdown = {}
+        for expense in queryset.select_related('currency'):
+            converted_amount = CurrencyService.convert_amount(
+                expense.amount,
+                expense.currency.code,
+                target_currency,
+                expense.date,
+            ) or Decimal('0.00')
+            key = expense.date.isoformat()
+            breakdown[key] = breakdown.get(key, Decimal('0.00')) + converted_amount
+
+        return {
+            'period': 'custom_dates',
+            'start_date': start_date.isoformat(),
+            'end_date': end_date.isoformat(),
+            'total': float(total),
+            'target_currency': target_currency,
+            'expense_count': queryset.count(),
+            'average_expense': float(total / queryset.count()) if queryset.count() > 0 else 0,
+            'daily_breakdown': {day: float(amount) for day, amount in sorted(breakdown.items())},
+        }
+
     def export_year_range_report_csv(self, start_year: int, end_year: int, target_currency: str = 'EUR') -> bytes:
         report = self.generate_year_range_report(start_year, end_year, target_currency)
         output = StringIO()
@@ -156,6 +265,28 @@ class ReportService:
             writer.writerow([year, total])
         return output.getvalue().encode('utf-8')
 
+    def export_custom_date_report_csv(self, start_date: date, end_date: date, target_currency: str = 'EUR') -> bytes:
+        queryset = self._get_user_expenses().filter(date__gte=start_date, date__lte=end_date)
+        return self._export_rows_csv('Expense Tracker Custom Date Report', f'{start_date} to {end_date}', queryset, target_currency)
+        report = self.generate_custom_date_report(start_date, end_date, target_currency)
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['Expense Tracker Custom Date Report'])
+        writer.writerow(['Start Date', 'End Date', 'Currency', 'Total', 'Expense Count', 'Average Expense'])
+        writer.writerow([
+            report['start_date'],
+            report['end_date'],
+            report['target_currency'],
+            report['total'],
+            report['expense_count'],
+            report['average_expense'],
+        ])
+        writer.writerow([])
+        writer.writerow(['Date', 'Total'])
+        for expense_date, total in report['daily_breakdown'].items():
+            writer.writerow([expense_date, total])
+        return output.getvalue().encode('utf-8')
+
     def export_year_range_report_pdf(self, start_year: int, end_year: int, target_currency: str = 'EUR') -> bytes:
         report = self.generate_year_range_report(start_year, end_year, target_currency)
         pdf = FPDF()
@@ -173,9 +304,30 @@ class ReportService:
         pdf.cell(0, 8, 'Yearly Breakdown', 0, 1)
         for year, total in report['yearly_breakdown'].items():
             pdf.cell(0, 8, f"{year}: {total}", 0, 1)
-        return pdf.output(dest='S').encode('latin-1')
+        return bytes(pdf.output(dest='S'))
 
-    def generate_category_report(self, year: int, month: int = None) -> dict:
+    def export_custom_date_report_pdf(self, start_date: date, end_date: date, target_currency: str = 'EUR') -> bytes:
+        queryset = self._get_user_expenses().filter(date__gte=start_date, date__lte=end_date)
+        return self._export_rows_pdf('Expense Tracker Custom Date Report', f'{start_date} to {end_date}', queryset, target_currency)
+        report = self.generate_custom_date_report(start_date, end_date, target_currency)
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font('Arial', 'B', 16)
+        pdf.cell(0, 10, 'Expense Tracker Custom Date Range Report', 0, 1, 'C')
+        pdf.ln(5)
+        pdf.set_font('Arial', '', 12)
+        pdf.multi_cell(
+            0,
+            8,
+            f"Start Date: {report['start_date']}\nEnd Date: {report['end_date']}\nCurrency: {report['target_currency']}\nTotal: {report['total']}\nExpense Count: {report['expense_count']}\nAverage Expense: {report['average_expense']}"
+        )
+        pdf.ln(5)
+        pdf.cell(0, 8, 'Daily Breakdown', 0, 1)
+        for expense_date, total in report['daily_breakdown'].items():
+            pdf.cell(0, 8, f"{expense_date}: {total}", 0, 1)
+        return bytes(pdf.output(dest='S'))
+
+    def generate_category_report(self, year: int, month: int = None, target_currency: str = 'EUR') -> dict:
         """
         Generate expense report by category.
         
@@ -191,30 +343,36 @@ class ReportService:
         if month is not None:
             queryset = queryset.filter(date__month=month)
         
-        category_data = queryset.values('category__name').annotate(
-            total=Sum('amount')
-        ).order_by('-total')
-        
-        categories = {
-            item['category__name']: {
-                'total': float(item['total']),
+        categories = {}
+        for expense in queryset.select_related('category', 'currency'):
+            converted_amount = CurrencyService.convert_amount(
+                expense.amount,
+                expense.currency.code,
+                target_currency,
+                expense.date,
+            ) or Decimal('0.00')
+            category = categories.setdefault(expense.category.name, {
+                'total': Decimal('0.00'),
                 'percentage': 0
-            }
-            for item in category_data
-        }
+            })
+            category['total'] += converted_amount
+
+        categories = dict(sorted(categories.items(), key=lambda item: item[1]['total'], reverse=True))
         
-        total = sum(cat['total'] for cat in categories.values())
+        total = sum((cat['total'] for cat in categories.values()), Decimal('0.00'))
         
         # Calculate percentages
         for category in categories.values():
             if total > 0:
                 category['percentage'] = round((category['total'] / total) * 100, 2)
+            category['total'] = float(category['total'])
         
         return {
             'period': 'monthly' if month else 'yearly',
             'year': year,
             'month': month,
             'total': float(total),
+            'target_currency': target_currency,
             'categories': categories
         }
     
@@ -261,6 +419,8 @@ class ReportService:
         }
 
     def export_monthly_report_csv(self, year: int, month: int, target_currency: str = 'EUR') -> bytes:
+        queryset = self._get_user_expenses().filter(date__year=year, date__month=month)
+        return self._export_rows_csv('Expense Tracker Monthly Report', f'{month:02d}/{year}', queryset, target_currency)
         report = self.generate_monthly_report(year, month, target_currency)
         output = StringIO()
         writer = csv.writer(output)
@@ -280,6 +440,8 @@ class ReportService:
         return output.getvalue().encode('utf-8')
 
     def export_yearly_report_csv(self, year: int, target_currency: str = 'EUR') -> bytes:
+        queryset = self._get_user_expenses().filter(date__year=year)
+        return self._export_rows_csv('Expense Tracker Yearly Report', str(year), queryset, target_currency)
         report = self.generate_yearly_report(year, target_currency)
         output = StringIO()
         writer = csv.writer(output)
@@ -300,6 +462,8 @@ class ReportService:
         return output.getvalue().encode('utf-8')
 
     def export_monthly_report_pdf(self, year: int, month: int, target_currency: str = 'EUR') -> bytes:
+        queryset = self._get_user_expenses().filter(date__year=year, date__month=month)
+        return self._export_rows_pdf('Expense Tracker Monthly Report', f'{month:02d}/{year}', queryset, target_currency)
         report = self.generate_monthly_report(year, month, target_currency)
         pdf = FPDF()
         pdf.add_page()
@@ -311,6 +475,8 @@ class ReportService:
         return bytes(pdf.output(dest='S'))
 
     def export_yearly_report_pdf(self, year: int, target_currency: str = 'EUR') -> bytes:
+        queryset = self._get_user_expenses().filter(date__year=year)
+        return self._export_rows_pdf('Expense Tracker Yearly Report', str(year), queryset, target_currency)
         report = self.generate_yearly_report(year, target_currency)
         pdf = FPDF()
         pdf.add_page()
@@ -331,6 +497,8 @@ class ReportService:
     
     def export_year_range_report_csv(self, start_year: int, end_year: int, target_currency: str = 'EUR') -> bytes:
         """Export year range report as CSV."""
+        queryset = self._get_user_expenses().filter(date__year__gte=start_year, date__year__lte=end_year)
+        return self._export_rows_csv('Expense Tracker Year Range Report', f'{start_year} to {end_year}', queryset, target_currency)
         report = self.generate_year_range_report(start_year, end_year, target_currency)
         output = StringIO()
         writer = csv.writer(output)
@@ -352,6 +520,8 @@ class ReportService:
     
     def export_year_range_report_pdf(self, start_year: int, end_year: int, target_currency: str = 'EUR') -> bytes:
         """Export year range report as PDF."""
+        queryset = self._get_user_expenses().filter(date__year__gte=start_year, date__year__lte=end_year)
+        return self._export_rows_pdf('Expense Tracker Year Range Report', f'{start_year} to {end_year}', queryset, target_currency)
         report = self.generate_year_range_report(start_year, end_year, target_currency)
         pdf = FPDF()
         pdf.add_page()

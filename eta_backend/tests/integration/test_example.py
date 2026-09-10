@@ -174,7 +174,19 @@ class TestCurrencyConversionAPIContract:
         assert data['rate'] is not None
         if data['rate']:
             assert data['converted'] == 110.0
-    
+
+    def test_current_rates_endpoint_returns_active_matrix(self, authenticated_client):
+        """Test the active rates matrix endpoint used by the offline cache warm-up flow."""
+        response = authenticated_client.get('/api/rates/current/')
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+
+        assert 'rates' in data
+        assert 'EUR' in data['rates']
+        assert 'USD' in data['rates']
+        assert 'UGX' in data['rates']
+        assert data['rates']['EUR']['USD'] > 0
+
     def test_convert_same_currency(self, authenticated_client):
         """Test converting to same currency returns rate of 1."""
         response = authenticated_client.get(
@@ -271,6 +283,25 @@ class TestExportReportAPIContract:
         report = response.json()
         assert report['period'] == 'year_range'
         assert 'yearly_breakdown' in report
+
+    def test_export_custom_date_range_report_format(self, authenticated_client, multiple_expenses):
+        """Test custom date range export report format."""
+        today = date.today()
+        start_date = date(today.year, today.month, 1)
+        end_date = date(today.year, today.month, min(28, today.day)) if today.day > 1 else start_date
+        data = {
+            'period': 'custom_dates',
+            'date_start': start_date.isoformat(),
+            'date_end': end_date.isoformat(),
+            'target_currency': 'EUR'
+        }
+        response = authenticated_client.post('/api/export-report/', data)
+        assert response.status_code == status.HTTP_200_OK
+        report = response.json()
+        assert report['period'] == 'custom_dates'
+        assert report['start_date'] == start_date.isoformat()
+        assert report['end_date'] == end_date.isoformat()
+        assert 'total' in report
 
 
 @pytest.mark.integration

@@ -5,10 +5,14 @@ These tests focus on the service layer and business logic.
 import pytest
 from decimal import Decimal
 from datetime import date, timedelta
+from unittest.mock import patch
+from django.core.cache import cache
+from expenses.models import Currency, CurrencyRate
 from expenses.services.expense_service import ExpenseService
 from expenses.services.summary_service import SummaryService
 from expenses.services.currency_service import CurrencyService
 from expenses.services.report_service import ReportService
+from expenses.tasks import update_currency_rates
 
 
 @pytest.mark.unit
@@ -195,6 +199,32 @@ class TestSummaryService:
         
         assert isinstance(monthly_breakdown, dict)
 
+    def test_get_yearly_by_category_uses_quantity_and_sums_category(self, test_user, category, currency):
+        """Test category totals use full line amounts across the year."""
+        from expenses.models import ExpenseEntry
+
+        ExpenseEntry.objects.create(
+            user=test_user,
+            date=date.today(),
+            category=category,
+            quantity=Decimal('3'),
+            amount=Decimal('20'),
+            currency=currency,
+        )
+        ExpenseEntry.objects.create(
+            user=test_user,
+            date=date.today(),
+            category=category,
+            quantity=Decimal('2'),
+            amount=Decimal('15'),
+            currency=currency,
+        )
+
+        totals = SummaryService(test_user).get_yearly_by_category(date.today().year, 'EUR')
+
+        assert totals[0]['category'] == category.name
+        assert totals[0]['total'] == Decimal('90.00')
+
 
 @pytest.mark.unit
 class TestCurrencyService:
@@ -245,6 +275,39 @@ class TestCurrencyService:
         history = CurrencyService.get_rate_history('EUR', 'USD', limit=10)
         
         assert isinstance(history, list)
+
+    @pytest.mark.django_db
+    def test_update_currency_rates_warms_cache(self, db):
+        """The weekly task should warm the Redis-backed matrix used by the API."""
+        cache.clear()
+        eur = Currency.objects.create(code='EUR', name='Euro', symbol='€')
+        usd = Currency.objects.create(code='USD', name='US Dollar', symbol='$')
+        ugx = Currency.objects.create(code='UGX', name='Uganda Shilling', symbol='USh')
+        CurrencyRate.objects.create(
+            base_currency=usd,
+            target_currency=ugx,
+            rate=Decimal('3700.00'),
+            effective_date=date.today(),
+        )
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self):
+                return b'{"rates": {"USD": 1.08}}'
+
+        with patch('urllib.request.urlopen', return_value=FakeResponse()):
+            result = update_currency_rates()
+
+        assert 'Rates updated' in result
+        matrix = cache.get('active_weekly_rates')
+        assert matrix is not None
+        assert matrix['EUR']['USD'] == 1.08
+        assert matrix['USD']['UGX'] > 0
 
 
 @pytest.mark.unit

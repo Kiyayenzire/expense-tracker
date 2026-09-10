@@ -1,42 +1,55 @@
-version: '3.8'
-
 services:
   db_test:
     image: postgres:15-alpine
-    env_file:
-      - ./.env.dev
     environment:
       POSTGRES_DB: test_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d test_db"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   redis_test:
     image: redis:7-alpine
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
 
   frontend_test:
     build:
-      context: ./frontend
+      context: ./eta_frontend
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: http://backend_test:8000/api
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
     ports:
       - "5173:5173"
     depends_on:
-      - backend_test
+      backend_test:
+        condition: service_completed_successfully
 
   backend_test:
     build:
-      context: ./backend
+      context: ./eta_backend
       dockerfile: Dockerfile
+      args:
+        PYTHON_ENV: test
     command: pytest --maxfail=1 --disable-warnings
-    env_file:
-      - ./.env.dev
     environment:
-      DJANGO_DEBUG: "True"
-      DJANGO_SETTINGS_MODULE: backend.settings
-      DATABASE_URL: postgres://postgres:postgres_password@db_test:5432/test_db
-      CELERY_BROKER_URL: redis://redis_test:6379/0
-      FRONTEND_URL: http://frontend_test:5173
+      - DJANGO_DEBUG=True
+      - DJANGO_SETTINGS_MODULE=backend.settings
+      - DATABASE_URL=postgres://postgres:postgres_password@db_test:5432/test_db
+      - CELERY_BROKER_URL=redis://redis_test:6379/0
+      - FRONTEND_URL=http://frontend_test:5173
     depends_on:
-      - db_test
-      - redis_test
+      db_test:
+        condition: service_healthy
+      redis_test:
+        condition: service_healthy
+

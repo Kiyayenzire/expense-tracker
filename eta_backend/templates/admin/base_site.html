@@ -1,0 +1,15 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}ETA{% endblock %}
+
+{% block branding %}
+<a href="{% url 'admin:index' %}" class="eta-brand">ETA</a>
+{% endblock %}
+
+{% block nav-global %}{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'eta_admin.css' %}">
+{% endblock %}
