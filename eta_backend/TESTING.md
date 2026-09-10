@@ -185,7 +185,7 @@ def test_user_cannot_see_other_user_expenses(self, authenticated_client, admin_c
 def test_predict_with_no_data(self, test_user):
     predictor = ExpensePredictor(test_user)
     predictions = predictor.predict_next_month()
-    assert predictions == {}
+    assert predictions == {'predictions': {}, 'high_volume_categories': []}
 ```
 
 ## Running Tests in CI/CD
