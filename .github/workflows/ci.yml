@@ -9,14 +9,20 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: "sqlite:///:memory:"
+      SECRET_KEY: "dummy-secret-key-for-testing"
+      DEBUG: "False"
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install backend dependencies
         working-directory: eta_backend
@@ -30,9 +36,9 @@ jobs:
           python -m pytest -q
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: "22"
 
       - name: Install frontend dependencies
         working-directory: eta_frontend
@@ -46,6 +52,7 @@ jobs:
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
       packages: write
@@ -53,17 +60,17 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push backend image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./eta_backend
           file: ./eta_backend/Dockerfile
@@ -73,7 +80,7 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/eta_backend:${{ github.sha }}
 
       - name: Build and push frontend image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./eta_frontend
           file: ./eta_frontend/Dockerfile
