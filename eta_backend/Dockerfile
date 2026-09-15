@@ -17,12 +17,11 @@ COPY requirements ./requirements
 RUN pip install --upgrade pip && \
     if [ "$PYTHON_ENV" = "test" ]; then pip install -r requirements/test.txt; else pip install -r requirements/prod.txt; fi
 
-# Copy entrypoint script, strip CRLF line endings, and grant executable permissions
-COPY entrypoint.sh /app/entrypoint.sh
-RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
-
-# Copy the entire backend application source code into the container
+# Copy the entire backend application source code into the container FIRST
 COPY . /app
+
+# Strip CRLF line endings and grant executable permissions AFTER copying source code
+RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 EXPOSE 8000
 
