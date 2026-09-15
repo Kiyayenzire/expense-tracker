@@ -11,7 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env(
     DEBUG=(bool, False),
-    DJANGO_ALLOWED_HOSTS=(list, ['*']),
+    DJANGO_ALLOWED_HOSTS=(list, ['eta.althech.com', 'localhost', '127.0.0.1', 'backend']),
     DEFAULT_CURRENCY=(str, 'EUR'),
 )
 
@@ -34,14 +34,11 @@ DJANGO_ADMIN_URL = env('DJANGO_ADMIN_URL', default='admin/').strip('/') + '/'
 REDIS_URL = env('REDIS_URL', default='redis://localhost:6379/1')
 
 # Parse ALLOWED_HOSTS into a clean Python list
-raw_hosts = env('DJANGO_ALLOWED_HOSTS', default='*')
+raw_hosts = env('DJANGO_ALLOWED_HOSTS', default='eta.althech.com,localhost,127.0.0.1,backend')
 if isinstance(raw_hosts, str):
     ALLOWED_HOSTS = [host.strip() for host in raw_hosts.split(',') if host.strip()]
 else:
     ALLOWED_HOSTS = raw_hosts
-
-if not ALLOWED_HOSTS or ALLOWED_HOSTS == ['*']:
-    ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
 # ============================================================================== 
 # 2. DJANGO APPLICATIONS AND MIDDLEWARE
@@ -86,7 +83,7 @@ ROOT_URLCONF = 'backend.urls'
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'BACKEND': 'django.template.backends.DjangoTemplates',
         'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
@@ -110,8 +107,13 @@ DATABASES = {
 }
 
 # ============================================================================== 
-# 4. AUTHENTICATION AND SECURITY SETTINGS
+# 4. AUTHENTICATION, SECURITY & PROXY SETTINGS
 # ============================================================================== 
+# Trust HTTPS headers forwarded by Cloudflare and Nginx reverse proxy
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
+
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
@@ -169,7 +171,7 @@ else:
         }
 
 # ============================================================================== 
-# 5. REST FRAMEWORK AND AUTH CONFIGURATION
+# 5. REST FRAMEWORK, CORS & CSRF CONFIGURATION
 # ============================================================================== 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -192,10 +194,13 @@ ACCOUNT_SIGNUP_FIELDS = ['username*', 'email*']
 ACCOUNT_EMAIL_VERIFICATION = env('ACCOUNT_EMAIL_VERIFICATION', default='optional')
 ACCOUNT_EMAIL_SUBJECT_PREFIX = '[Expense Tracker] '
 ACCOUNT_ADAPTER = 'accounts.adapters.CustomAccountAdapter'
-FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:5173')
+FRONTEND_URL = env('FRONTEND_URL', default='https://eta.althech.com')
 
-# Allow multiple localhost ports for development (Vite may use 5174, 5175, etc. if ports are in use)
-if DEBUG:
+# Dynamic CORS & CSRF Trusted Origins
+raw_cors = env('CORS_ALLOWED_ORIGINS', default='')
+if raw_cors:
+    CORS_ALLOWED_ORIGINS = [origin.strip() for origin in raw_cors.split(',') if origin.strip()]
+elif DEBUG:
     CORS_ALLOWED_ORIGINS = [
         'http://localhost:5173',
         'http://localhost:5174',
@@ -208,8 +213,17 @@ if DEBUG:
     ]
 else:
     CORS_ALLOWED_ORIGINS = [
+        'https://eta.althech.com',
         'http://localhost:5173',
     ]
+
+raw_csrf = env('CSRF_TRUSTED_ORIGINS', default='')
+if raw_csrf:
+    CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in raw_csrf.split(',') if origin.strip()]
+elif DEBUG:
+    CSRF_TRUSTED_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173']
+else:
+    CSRF_TRUSTED_ORIGINS = ['https://eta.althech.com']
 
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
@@ -219,8 +233,6 @@ AUTHENTICATION_BACKENDS = [
 # ============================================================================== 
 # 6. EMAIL CONFIGURATION (DEV VS PRODUCTION)
 # ============================================================================== 
-# Development defaults to Console backend (prints email in terminal).
-# Production uses SMTP with Gmail or configured SMTP provider.
 EMAIL_BACKEND = env(
     'EMAIL_BACKEND',
     default='django.core.mail.backends.console.EmailBackend' if DEBUG else 'django.core.mail.backends.smtp.EmailBackend',
@@ -248,12 +260,10 @@ CELERY_ENABLE_UTC = True
 
 # Celery Beat Periodic Schedule
 CELERY_BEAT_SCHEDULE = {
-    # Task 1: Check and send email reminder if UGX rate hasn't been updated
     'send-currency-reminder-mon-tue': {
         'task': 'expenses.tasks.send_currency_update_reminder',
         'schedule': crontab(day_of_week='monday,tuesday', hour=9, minute=0),
     },
-    # Task 2: Calculate and update cross-rates in DB
     'update-currency-rates-mon-tue': {
         'task': 'expenses.tasks.update_currency_rates',
         'schedule': crontab(day_of_week='monday,tuesday', hour=12, minute=0),
