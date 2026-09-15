@@ -1,19 +1,16 @@
 import pytest
+from django.urls import reverse
 
 from accounts.models import User
 
-
 pytestmark = pytest.mark.django_db
-
-
-ADMIN_URL = '/admin/'
 
 
 def test_regular_user_cannot_access_admin(client):
     user = User.objects.create_user(username='regular-user', password='StrongPass123!')
     client.force_login(user)
 
-    response = client.get(ADMIN_URL)
+    response = client.get(reverse('admin:index'))
 
     assert response.status_code == 403
 
@@ -26,7 +23,7 @@ def test_superuser_can_access_admin(client):
     )
     client.force_login(user)
 
-    response = client.get(ADMIN_URL)
+    response = client.get(reverse('admin:index'))
 
     assert response.status_code == 200
 
