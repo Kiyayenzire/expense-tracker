@@ -30,6 +30,18 @@ services:
     networks:
       - internal_network
 
+  migration:
+    image: ghcr.io/kiyayenzire/eta_backend:latest
+    container_name: eta_migration
+    command: sh -c "python manage.py migrate --noinput && python manage.py seed_initial_data"
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal_network
+
   backend:
     image: ghcr.io/kiyayenzire/eta_backend:latest
     container_name: eta_backend
@@ -44,6 +56,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migration:
+        condition: service_completed_successfully
     networks:
       - internal_network
       - web_network
@@ -60,6 +74,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migration:
+        condition: service_completed_successfully
     networks:
       - internal_network
 
@@ -75,6 +91,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migration:
+        condition: service_completed_successfully
     networks:
       - internal_network
 
