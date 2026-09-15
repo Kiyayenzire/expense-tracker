@@ -10,12 +10,11 @@ from celery.schedules import crontab
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env(
-    DEBUG=(bool, False),
+    DJANGO_DEBUG=(bool, False),
     DJANGO_ALLOWED_HOSTS=(list, ['eta.althech.com', 'localhost', '127.0.0.1', 'backend']),
     DEFAULT_CURRENCY=(str, 'EUR'),
 )
 
-# Environment files live in the repository root, next to eta_backend.
 PROJECT_ROOT = BASE_DIR.parent
 env_file = PROJECT_ROOT / '.env'
 dev_env_file = PROJECT_ROOT / '.env.dev'
@@ -29,16 +28,12 @@ elif dev_env_file.exists():
     environ.Env.read_env(dev_env_file)
 
 SECRET_KEY = env('DJANGO_SECRET_KEY', default='dev-secret-key')
-DEBUG = env('DJANGO_DEBUG', default=True)
+DEBUG = env.bool('DJANGO_DEBUG', default=False)
 DJANGO_ADMIN_URL = env('DJANGO_ADMIN_URL', default='admin/').strip('/') + '/'
 REDIS_URL = env('REDIS_URL', default='redis://localhost:6379/1')
 
-# Parse ALLOWED_HOSTS into a clean Python list
-raw_hosts = env('DJANGO_ALLOWED_HOSTS', default='eta.althech.com,localhost,127.0.0.1,backend')
-if isinstance(raw_hosts, str):
-    ALLOWED_HOSTS = [host.strip() for host in raw_hosts.split(',') if host.strip()]
-else:
-    ALLOWED_HOSTS = raw_hosts
+# Read parsed list directly from django-environ schema
+ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS')
 
 # ============================================================================== 
 # 2. DJANGO APPLICATIONS AND MIDDLEWARE
