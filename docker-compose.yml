@@ -33,9 +33,11 @@ services:
   migration:
     image: ghcr.io/kiyayenzire/eta_backend:latest
     container_name: eta_migration
-    command: sh -c "python manage.py migrate --noinput && python manage.py seed_initial_data"
+    command: sh -c "python manage.py migrate --noinput && python manage.py collectstatic --noinput && python manage.py seed_initial_data"
     env_file:
       - .env
+    volumes:
+      - staticfiles:/app/staticfiles
     depends_on:
       db:
         condition: service_healthy
@@ -71,6 +73,8 @@ services:
     command: celery -A backend worker --loglevel=info
     env_file:
       - .env
+    volumes:
+      - media_data:/app/media
     depends_on:
       db:
         condition: service_healthy
@@ -85,7 +89,7 @@ services:
     image: ghcr.io/kiyayenzire/eta_backend:latest
     container_name: eta_celery_beat
     restart: always
-    command: celery -A backend beat --loglevel=info
+    command: celery -A backend beat --loglevel=info -S django_celery_beat.schedulers:DatabaseScheduler --pidfile=/tmp/celerybeat.pid
     env_file:
       - .env
     depends_on:
@@ -102,9 +106,12 @@ services:
     image: ghcr.io/kiyayenzire/eta_frontend:latest
     container_name: eta_frontend
     restart: always
+    ports:
+      - "127.0.0.1:3002:5173"
     depends_on:
       - backend
     networks:
+      - internal_network
       - web_network
 
 networks:

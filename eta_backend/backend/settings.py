@@ -29,10 +29,9 @@ elif dev_env_file.exists():
 
 SECRET_KEY = env('DJANGO_SECRET_KEY', default='dev-secret-key')
 DEBUG = env.bool('DJANGO_DEBUG', default=False)
-DJANGO_ADMIN_URL = env('DJANGO_ADMIN_URL', default='admin/').strip('/') + '/'
+DJANGO_ADMIN_URL = env('DJANGO_ADMIN_URL', default='admin').strip('/') + '/'
 REDIS_URL = env('REDIS_URL', default='redis://localhost:6379/1')
 
-# Read parsed list directly from django-environ schema
 ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS')
 
 # ============================================================================== 
@@ -78,7 +77,6 @@ ROOT_URLCONF = 'backend.urls'
 
 TEMPLATES = [
     {
-        # Incorrect: 'django.template.backends.DjangoTemplates'
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
@@ -99,13 +97,12 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # 3. DATABASE CONFIGURATION
 # ============================================================================== 
 DATABASES = {
-    'default': env.db('DATABASE_URL')
+    'default': env.db('DATABASE_URL', default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
 }
 
 # ============================================================================== 
 # 4. AUTHENTICATION, SECURITY & PROXY SETTINGS
 # ============================================================================== 
-# Trust HTTPS headers forwarded by Cloudflare and Nginx reverse proxy
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
 USE_X_FORWARDED_PORT = True
@@ -131,7 +128,7 @@ SHORT_DATETIME_FORMAT = 'd/m/Y H:i'
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [BASE_DIR / 'static']
+STATICFILES_DIRS = [BASE_DIR / 'static'] if (BASE_DIR / 'static').exists() else []
 STATICFILES_STORAGE = (
     'django.contrib.staticfiles.storage.StaticFilesStorage'
     if is_pytest
@@ -143,7 +140,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Redis-backed cache with a safe local-memory fallback for local/dev/test environments.
+# Redis Cache Setup
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
@@ -193,6 +190,8 @@ ACCOUNT_ADAPTER = 'accounts.adapters.CustomAccountAdapter'
 FRONTEND_URL = env('FRONTEND_URL', default='https://eta.althech.com')
 
 # Dynamic CORS & CSRF Trusted Origins
+CORS_ALLOW_CREDENTIALS = True
+
 raw_cors = env('CORS_ALLOWED_ORIGINS', default='')
 if raw_cors:
     CORS_ALLOWED_ORIGINS = [origin.strip() for origin in raw_cors.split(',') if origin.strip()]
@@ -227,7 +226,7 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 # ============================================================================== 
-# 6. EMAIL CONFIGURATION (DEV VS PRODUCTION)
+# 6. EMAIL CONFIGURATION
 # ============================================================================== 
 EMAIL_BACKEND = env(
     'EMAIL_BACKEND',
@@ -250,7 +249,9 @@ FIXER_API_KEY = env('FIXER_API_KEY', default='')
 DEFAULT_CURRENCY = env('DEFAULT_CURRENCY', default='EUR')
 FRANKFURTER_URL = env('FRANKFURTER_URL', default='http://rates:8080')
 
-# Celery Timezone Settings
+# Celery Core Settings
+CELERY_BROKER_URL = env('CELERY_BROKER_URL', default=REDIS_URL)
+CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND', default='django-db')
 CELERY_TIMEZONE = 'Europe/Berlin'
 CELERY_ENABLE_UTC = True
 
