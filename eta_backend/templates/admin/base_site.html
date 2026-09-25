@@ -1,10 +1,16 @@
 {% extends "admin/base.html" %}
 {% load static %}
 
-{% block title %}ETA{% endblock %}
+{% block title %}ETA Workspace{% endblock %}
 
 {% block branding %}
-<a href="{% url 'admin:index' %}" class="eta-brand">ETA</a>
+<a href="{% url 'admin:index' %}" class="eta-brand">
+	<span class="eta-brand-mark">ETA</span>
+	<span class="eta-brand-copy">
+				<strong>ETA Workspace</strong>
+				<small>Secure workspace access</small>
+	</span>
+</a>
 {% endblock %}
 
 {% block nav-global %}{% endblock %}

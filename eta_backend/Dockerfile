@@ -7,8 +7,9 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies and update OS packages to fix Debian CVEs
 RUN apt-get update -o Acquire::Retries=3 && \
+    apt-get upgrade -y && \
     apt-get install -y --no-install-recommends gcc libpq-dev curl && \
     rm -rf /var/lib/apt/lists/*
 

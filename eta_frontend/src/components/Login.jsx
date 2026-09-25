@@ -28,7 +28,7 @@ function Login({ onLogin }) {
   const [generalError, setGeneralError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+  const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8002/api';
 
   const clearErrors = () => {
     setFieldErrors({});
@@ -211,8 +211,8 @@ function Login({ onLogin }) {
   }, []);
 
   return (
-    <div className="container">
-      <div className="card">
+    <div className="auth-container">
+      <div className="card auth-card">
         {isResettingPassword ? (
           <>
             <div className="header">
@@ -227,7 +227,7 @@ function Login({ onLogin }) {
               </div>
             </div>
 
-            <form onSubmit={resetStep === 'request' ? handlePasswordReset : handlePasswordResetConfirm}>
+            <form className="auth-form" onSubmit={resetStep === 'request' ? handlePasswordReset : handlePasswordResetConfirm}>
               {resetStep === 'request' ? (
                 <>
                   <div className="form-group">
@@ -288,7 +288,7 @@ function Login({ onLogin }) {
               {generalError && <p className="small-text" style={{ color: '#dc2626' }}>{generalError}</p>}
               {success && <p className="small-text" style={{ color: '#16a34a' }}>{success}</p>}
 
-              <button type="submit">
+              <button className="auth-submit" type="submit">
                 {resetStep === 'request' ? 'Send Reset Link' : 'Reset Password'}
               </button>
             </form>
@@ -297,7 +297,7 @@ function Login({ onLogin }) {
               <p className="small-text">
                 <button
                   type="button"
-                  className="link-button"
+                  className="auth-action-button"
                   onClick={() => {
                     setIsResettingPassword(false);
                     setResetStep('request');
@@ -323,7 +323,7 @@ function Login({ onLogin }) {
               </div>
             </div>
 
-            <form id="login-form" onSubmit={handleSubmit}>
+            <form id="login-form" className="auth-form" onSubmit={handleSubmit}>
               {/* USERNAME / IDENTIFIER FIELD */}
               <div className="form-group">
                 <label htmlFor="identifier">
@@ -407,9 +407,9 @@ function Login({ onLogin }) {
               {success && <p className="small-text" style={{ color: '#16a34a' }}>{success}</p>}
 
               {isRegistering ? (
-                <button type="submit">Create Account</button>
+                <button className="auth-submit" type="submit">Create Account</button>
               ) : (
-                <button type="submit">Login</button>
+                <button className="auth-submit" type="submit">Login</button>
               )}
             </form>
 
@@ -419,7 +419,7 @@ function Login({ onLogin }) {
                   Already have an account?{' '}
                   <button
                     type="button"
-                    className="link-button"
+                    className="auth-action-button"
                     onClick={() => {
                       setIsRegistering(false);
                       clearErrors();

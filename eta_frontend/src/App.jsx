@@ -44,7 +44,7 @@ function App() {
   useEffect(() => {
     if (!token) return;
 
-    fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'}/auth/profile/`, {
+    fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8002/api'}/auth/profile/`, {
       headers: {
         Authorization: `Token ${token}`,
       },
@@ -117,7 +117,7 @@ function App() {
     }
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'}/auth/delete-account/`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8002/api'}/auth/delete-account/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

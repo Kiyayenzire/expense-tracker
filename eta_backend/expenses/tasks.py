@@ -2,11 +2,13 @@ import json
 import urllib.request
 from datetime import timedelta
 from decimal import Decimal
+
 from celery import shared_task
 from django.conf import settings
 from django.core.cache import cache
 from django.core.mail import send_mail
 from django.utils import timezone
+
 from .models import Currency, CurrencyRate
 from .services.prediction_service import ExpensePredictor
 
@@ -25,9 +27,16 @@ def calculate_predictions(user_id):
 @shared_task
 def update_currency_rates():
     today = timezone.localdate()
-    rates = {}
+    start_of_week = today - timedelta(days=today.weekday())
 
-    # 1. Fetch EUR and USD from Frankfurter (Local Docker or Public API)
+    eur_curr = Currency.objects.filter(code='EUR').first()
+    usd_curr = Currency.objects.filter(code='USD').first()
+    ugx_curr = Currency.objects.filter(code='UGX').first()
+
+    if not (eur_curr and usd_curr and ugx_curr):
+        return "Error: Currency models (EUR, USD, UGX) must exist in database."
+
+    # 1. Fetch EUR -> USD rate from Frankfurter
     frankfurter_url = getattr(settings, 'FRANKFURTER_URL', 'https://api.frankfurter.dev')
     url = f"{frankfurter_url}/v1/latest?base=EUR&symbols=USD"
 
@@ -35,107 +44,107 @@ def update_currency_rates():
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=10) as response:
             payload = json.loads(response.read().decode())
-            rates['EUR'] = 1.0
-            rates['USD'] = payload['rates']['USD']
-    except Exception as exc:
-        return f"Failed to fetch EUR/USD from Frankfurter: {str(exc)}"
+            eur_usd_rate = Decimal(str(payload['rates']['USD']))
+    except Exception:
+        eur_usd_rate = Decimal('1.08')
 
-    # 2. Get Currency objects from database
-    eur_curr = Currency.objects.filter(code='EUR').first()
-    usd_curr = Currency.objects.filter(code='USD').first()
-    ugx_curr = Currency.objects.filter(code='UGX').first()
-
-    if not (eur_curr and usd_curr and ugx_curr):
-        return "Error: Currency models (EUR, USD, UGX) must exist in the database."
-
-    # 3. Fetch the LAST ENTERED rate for EUR -> UGX in the database
-    last_ugx_entry = CurrencyRate.objects.filter(
+    # 2. Look up manual/latest UGX entries from database
+    latest_eur_ugx = CurrencyRate.objects.filter(
         base_currency=eur_curr,
-        target_currency=ugx_curr
+        target_currency=ugx_curr,
+        effective_date__lte=today,
     ).order_by('-effective_date', '-id').first()
 
-    if last_ugx_entry:
-        eur_to_ugx = float(last_ugx_entry.rate)
+    latest_usd_ugx = CurrencyRate.objects.filter(
+        base_currency=usd_curr,
+        target_currency=ugx_curr,
+        effective_date__lte=today,
+    ).order_by('-effective_date', '-id').first()
+
+    # Determine baseline USD -> UGX and EUR -> UGX
+    if latest_usd_ugx:
+        usd_ugx_rate = Decimal(str(latest_usd_ugx.rate))
     else:
-        # Initial fallback if database is brand new and has no entries yet
-        eur_to_ugx = 4100.0
+        usd_ugx_rate = Decimal('3700.0')
 
-    # Use the manually entered EUR -> UGX rate as the source of truth.
-    rates['UGX'] = eur_to_ugx
+    if latest_eur_ugx:
+        eur_ugx_rate = Decimal(str(latest_eur_ugx.rate))
+    elif latest_usd_ugx:
+        eur_ugx_rate = eur_usd_rate * usd_ugx_rate
+    else:
+        eur_ugx_rate = Decimal('4100.0')
+        usd_ugx_rate = eur_ugx_rate / eur_usd_rate
 
-    # 4. Save/Update cross-rates for the week (EUR, USD, UGX)
-    symbols = ['EUR', 'USD', 'UGX']
-    currency_objs = {'EUR': eur_curr, 'USD': usd_curr, 'UGX': ugx_curr}
+    # Calculate remaining inverse cross-rates
+    usd_eur_rate = Decimal('1.0') / eur_usd_rate
+    ugx_eur_rate = Decimal('1.0') / eur_ugx_rate
+    ugx_usd_rate = Decimal('1.0') / usd_ugx_rate
 
-    for source in symbols:
-        for target in symbols:
-            if source == target:
-                continue
+    # 3. Store all 6 directional exchange pairs for the current week
+    rate_map = [
+        (eur_curr, usd_curr, eur_usd_rate),
+        (eur_curr, ugx_curr, eur_ugx_rate),
+        (usd_curr, eur_curr, usd_eur_rate),
+        (usd_curr, ugx_curr, usd_ugx_rate),
+        (ugx_curr, eur_curr, ugx_eur_rate),
+        (ugx_curr, usd_curr, ugx_usd_rate),
+    ]
 
-            rate_value = Decimal(str(rates[target] / rates[source]))
+    for base, target, rate in rate_map:
+        CurrencyRate.objects.update_or_create(
+            base_currency=base,
+            target_currency=target,
+            effective_date=start_of_week,
+            defaults={'rate': rate},
+        )
 
-            CurrencyRate.objects.update_or_create(
-                base_currency=currency_objs[source],
-                target_currency=currency_objs[target],
-                effective_date=today,
-                defaults={'rate': rate_value},
-            )
-
+    # 4. Cache multi-currency matrix
     cache_payload = {
-        base: {target: float(rates[target] / rates[base]) for target in symbols}
-        for base in symbols
+        'EUR': {'USD': float(eur_usd_rate), 'UGX': float(eur_ugx_rate)},
+        'USD': {'EUR': float(usd_eur_rate), 'UGX': float(usd_ugx_rate)},
+        'UGX': {'EUR': float(ugx_eur_rate), 'USD': float(ugx_usd_rate)},
     }
     cache.set('active_weekly_rates', cache_payload, timeout=604800)
 
-    return f"Rates updated for week of {today}. (EUR/USD from Frankfurter, EUR/UGX carried forward from last entered rate: {eur_to_ugx})"
+    return (
+        f"Rates updated for week of {start_of_week}. "
+        f"(EUR/UGX: {eur_ugx_rate}, USD/UGX: {usd_ugx_rate})"
+    )
 
 
 @shared_task
 def send_currency_update_reminder():
-    """
-    Sends an email reminder during the Monday-Friday update window if an explicit manual EUR->UGX
-    rate entry for today has not been recorded yet.
-    """
     today = timezone.localdate()
-    week_start = today - timedelta(days=today.weekday())
-    window_end = week_start + timedelta(days=4)
-    eur_curr = Currency.objects.filter(code='EUR').first()
-    ugx_curr = Currency.objects.filter(code='UGX').first()
+    weekday = today.weekday()  # Monday = 0, Tuesday = 1
 
-    if not (eur_curr and ugx_curr):
-        return "Error: EUR or UGX currency records missing from database."
+    if weekday not in (0, 1):
+        return "Skipped: Reminders are only sent on Monday or Tuesday."
 
-    # A Monday entry satisfies the Tuesday reminder as well.
-    today_entry_exists = CurrencyRate.objects.filter(
-        base_currency=eur_curr,
-        target_currency=ugx_curr,
-        effective_date__gte=week_start,
-        effective_date__lte=window_end,
-        is_manual=True,
+    start_of_week = today - timedelta(days=weekday)
+
+    # BOTH USD->UGX AND EUR->UGX must be updated for this week to skip the reminder
+    usd_ugx_updated = CurrencyRate.objects.filter(
+        base_currency__code='USD',
+        target_currency__code='UGX',
+        effective_date__gte=start_of_week,
     ).exists()
 
-    if today_entry_exists:
-        return f"EUR->UGX rate already updated for {today}. Skipping email reminder."
+    eur_ugx_updated = CurrencyRate.objects.filter(
+        base_currency__code='EUR',
+        target_currency__code='UGX',
+        effective_date__gte=start_of_week,
+    ).exists()
+
+    if usd_ugx_updated and eur_ugx_updated:
+        return f"Skipped: Both USD/UGX and EUR/UGX exchange rates already updated for week of {start_of_week}."
 
     recipient = getattr(settings, 'CURRENCY_ADMIN_EMAIL', getattr(settings, 'DEFAULT_FROM_EMAIL', None))
     if not recipient:
-        return "Error: No recipient email configured in settings (CURRENCY_ADMIN_EMAIL)."
-
-    day_name = today.strftime('%A')
-    date_str = today.strftime('%b %d, %Y')
-
-    subject = f"Reminder: Update EUR/UGX Exchange Rate ({day_name}, {date_str})"
-    message = (
-        f"Hello,\n\n"
-        f"This is an automated reminder to check and update the EUR -> UGX exchange rate.\n\n"
-        f"If Monday was a public holiday, Bank of Uganda will publish the updated rate today ({day_name}).\n\n"
-        f"If no new rate is manually entered, the system will carry forward the last recorded rate.\n\n"
-        f"Regards,\nExpense Tracker System"
-    )
+        return "Error: No recipient email configured."
 
     send_mail(
-        subject=subject,
-        message=message,
+        subject=f"Reminder: Update Exchange Rates ({today.strftime('%A, %b %d, %Y')})",
+        message=f"Automated reminder to check and update both USD/UGX and EUR/UGX exchange rates for week starting {start_of_week}.",
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[recipient],
         fail_silently=False,

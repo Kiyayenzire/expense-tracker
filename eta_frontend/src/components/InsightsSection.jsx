@@ -6,9 +6,9 @@ export function InsightsSection({ prediction = {}, insights = {}, symbol }) {
 	const predictionPayload = insights.predictions || prediction || {};
 	const predictions = predictionPayload.predictions || predictionPayload;
 	const highVolumeCategories = predictionPayload.high_volume_categories || prediction.high_volume_categories || insights.high_volume_categories || [];
-	const predictedAmount = prediction.predicted_amount ?? prediction.prediction;
+	const predictedAmount = predictionPayload.predicted_amount ?? predictionPayload.prediction ?? prediction.predicted_amount ?? prediction.prediction;
 	const financialInsights = insights.financial_insights || [];
-	const showSpendingPrediction = false;
+	const showSpendingPrediction = true;
 	const showBudgetRecommendations = false;
 
 	return (

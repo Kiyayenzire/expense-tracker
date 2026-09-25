@@ -1,0 +1,15 @@
+export const MEASUREMENT_CHOICES = [
+  { value: 'br', label: 'Bar (br)' },
+  { value: 'bt', label: 'Bottle (bt)' },
+  { value: 'bx', label: 'Box (bx)' },
+  { value: 'ct', label: 'Carton (ct)' },
+  { value: 'kg', label: 'Kilogram (kg)' },
+  { value: 'ltr', label: 'Litre (ltr)' },
+  { value: 'mth', label: 'Month (mth)' },
+  { value: 'pc', label: 'Piece (pc)' },
+  { value: 'pk', label: 'Package (pk)' },
+  { value: 'pr', label: 'Pair (pr)' },
+  { value: 'tn', label: 'Tin (tn)' },
+  { value: 'un', label: 'Unit (un)' },
+  { value: 'yr', label: 'Year (yr)' },
+];

@@ -26,6 +26,8 @@ htmlcov/
 media/
 staticfiles/
 static/
+!eta_backend/static/
+!eta_backend/static/eta_admin.css
 
 # Node
 node_modules/
@@ -54,3 +56,6 @@ pnpm-lock.yaml
 frontend/dist/
 backend/static/
 backend/media/
+
+
+logs/   

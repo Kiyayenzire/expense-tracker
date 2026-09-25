@@ -1,38 +1,25 @@
 services:
-  db_test:
-    image: postgres:15-alpine
+  db:
+    image: postgres:16-alpine
     environment:
       POSTGRES_DB: test_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres_password
+      POSTGRES_PASSWORD: postgres
+    tmpfs:
+      - /var/lib/postgresql/data # Runs test database in RAM for faster execution
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d test_db"]
       interval: 3s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
+      timeout: 3s
+      retries: 5
 
-  redis_test:
+  redis:
     image: redis:7-alpine
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 3s
-      timeout: 5s
-      retries: 10
-      start_period: 5s
-
-  frontend_test:
-    build:
-      context: ./eta_frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_API_BASE_URL: http://backend_test:8000/api
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
-    ports:
-      - "5173:5173"
-    depends_on:
-      backend_test:
-        condition: service_completed_successfully
+      timeout: 3s
+      retries: 5
 
   backend_test:
     build:
@@ -40,16 +27,19 @@ services:
       dockerfile: Dockerfile
       args:
         PYTHON_ENV: test
-    command: pytest --maxfail=1 --disable-warnings
+    working_dir: /app
+    command: python -m pytest expenses/tests accounts/tests -q
     environment:
-      - DJANGO_DEBUG=True
-      - DJANGO_SETTINGS_MODULE=backend.settings
-      - DATABASE_URL=postgres://postgres:postgres_password@db_test:5432/test_db
-      - CELERY_BROKER_URL=redis://redis_test:6379/0
-      - FRONTEND_URL=http://frontend_test:5173
+      - PYTHON_ENV=test
+      - DEBUG=0
+      - SECRET_KEY=django-insecure-test-key-only-for-ci
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/test_db
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONPATH=/app
     depends_on:
-      db_test:
+      db:
         condition: service_healthy
-      redis_test:
+      redis:
         condition: service_healthy
-
+    volumes:
+      - ./eta_backend:/app

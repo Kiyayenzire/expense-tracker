@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { formatDateEU } from '../api';
+import { MEASUREMENT_CHOICES } from '../constants/measurements';
 
 const PAGE_SIZE = 11;
 
@@ -155,12 +156,9 @@ export function ExpenseTable({ expenses, displayCurrency, categories = [], curre
                   <div className="col-md-6">
                     <label className="form-label">Measurement</label>
                     <select className="form-control" value={draft.measurement || 'pc'} onChange={(event) => setDraft((current) => ({ ...current, measurement: event.target.value }))}>
-                      <option value="pc">Piece (pc)</option>
-                      <option value="tn">Tin (tn)</option>
-                      <option value="bt">Bottle (bt)</option>
-                      <option value="kg">Kilogram (kg)</option>
-                      <option value="ltr">Litre (ltr)</option>
-                      <option value="un">Unit (un)</option>
+                      {MEASUREMENT_CHOICES.map((choice) => (
+                        <option key={choice.value} value={choice.value}>{choice.label}</option>
+                      ))}
                     </select>
                   </div>
                   <div className="col-md-6">

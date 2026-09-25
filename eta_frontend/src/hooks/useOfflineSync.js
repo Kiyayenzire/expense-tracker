@@ -18,7 +18,12 @@ export const useOfflineSync = (client = axios) => {
     if (typeof navigator !== 'undefined' && navigator.onLine) {
       try {
         const response = await client.get('/rates/current/');
-        const data = response.data;
+        const data = response?.data ?? null;
+
+        if (!data) {
+          throw new Error('No rate data returned from the API');
+        }
+
         setRates(data);
         await saveCachedRates(data);
       } catch (error) {

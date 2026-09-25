@@ -28,13 +28,20 @@ class SubCategory(models.Model):
 
 
 class Item(models.Model):
-    MEASUREMENT_CHOICES = [
-        ('pc', 'Piece (pc)'),
-        ('tn', 'Tin (tn)'),
+    MEASUREMENT_CHOICES = [        
+        ('br', 'Bar(br)'),
         ('bt', 'Bottle (bt)'),
+        ('bx', 'Box (bx)'),
+        ('ct', 'Carton (ct)'),
         ('kg', 'Kilogram (kg)'),
         ('ltr', 'Litre (ltr)'),
-        ('un', 'Unit (un)'),
+        ('mth', 'Month (mth)'),
+        ('pc', 'Piece (pc)'),
+        ('pk', 'Package (pk)'),
+        ('pr', 'Pair (pr)'),
+        ('tn', 'Tin (tn)'),
+        ('un', 'Unit (un)'),   
+        ('yr', 'Year (yr)'),        
     ]
 
     description = models.CharField(max_length=128)
@@ -62,7 +69,7 @@ class Currency(models.Model):
 class CurrencyRate(models.Model):
     base_currency = models.ForeignKey(Currency, on_delete=models.CASCADE, related_name='base_rates')
     target_currency = models.ForeignKey(Currency, on_delete=models.CASCADE, related_name='target_rates')
-    rate = models.DecimalField(max_digits=18, decimal_places=8)
+    rate = models.DecimalField(max_digits=18, decimal_places=13)
     effective_date = models.DateField()
     is_manual = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

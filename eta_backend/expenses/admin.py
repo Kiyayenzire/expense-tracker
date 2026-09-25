@@ -30,19 +30,25 @@ class CurrencyRateAdmin(admin.ModelAdmin):
 				today = timezone.localdate()
 				week_start = today - timedelta(days=today.weekday())
 				window_end = week_start + timedelta(days=4)
+				allowed_pairs = {('EUR', 'UGX'), ('USD', 'UGX'), ('UGX', 'EUR'), ('UGX', 'USD')}
 
-				if base and base.code != 'EUR' or target and target.code != 'UGX':
-					raise ValidationError('The manual weekly rate must be EUR to UGX.')
+				if base and target:
+					pair = (base.code, target.code)
+					if pair not in allowed_pairs:
+						raise ValidationError('Manual weekly rates are only allowed for EUR/UGX, USD/UGX, UGX/EUR, and UGX/USD.')
+
 				if today.weekday() > 4:
-					raise ValidationError('Weekly EUR to UGX rates are locked after Friday. Update again next Monday.')
-				if CurrencyRate.objects.filter(
-					base_currency__code='EUR',
-					target_currency__code='UGX',
-					effective_date__gte=week_start,
-					effective_date__lte=window_end,
-					is_manual=True,
-				).exists():
-					raise ValidationError('A manual EUR to UGX rate was already recorded this week. Editing is locked until next Monday.')
+					raise ValidationError('Weekly exchange-rate updates are locked after Friday. Update again next Monday.')
+
+				manual_filter = {
+					'base_currency__code': base.code if base else None,
+					'target_currency__code': target.code if target else None,
+					'effective_date__gte': week_start,
+					'effective_date__lte': window_end,
+					'is_manual': True,
+				}
+				if base and target and CurrencyRate.objects.filter(**manual_filter).exists():
+					raise ValidationError('A manual rate for this pair was already recorded this week. Editing is locked until next Monday.')
 				if effective_date and not (week_start <= effective_date <= window_end):
 					raise ValidationError('The effective date must be a day from this Monday through Friday.')
 				return cleaned_data

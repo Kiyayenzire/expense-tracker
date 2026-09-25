@@ -96,9 +96,17 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # ============================================================================== 
 # 3. DATABASE CONFIGURATION
 # ============================================================================== 
-DATABASES = {
-    'default': env.db('DATABASE_URL', default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
-}
+if is_pytest:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'test_db.sqlite3',
+        }
+    }
+else:
+    DATABASES = {
+        'default': env.db('DATABASE_URL', default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
+    }
 
 # ============================================================================== 
 # 4. AUTHENTICATION, SECURITY & PROXY SETTINGS
@@ -106,6 +114,10 @@ DATABASES = {
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
 USE_X_FORWARDED_PORT = True
+
+# HTTPS Cookie Security
+CSRF_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SECURE = not DEBUG
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -192,33 +204,30 @@ FRONTEND_URL = env('FRONTEND_URL', default='https://eta.althech.com')
 # Dynamic CORS & CSRF Trusted Origins
 CORS_ALLOW_CREDENTIALS = True
 
+local_frontend_origins = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:5174',
+    'http://127.0.0.1:5174',
+    'http://localhost:3002',
+    'http://127.0.0.1:3002',
+]
+
 raw_cors = env('CORS_ALLOWED_ORIGINS', default='')
 if raw_cors:
     CORS_ALLOWED_ORIGINS = [origin.strip() for origin in raw_cors.split(',') if origin.strip()]
 elif DEBUG:
-    CORS_ALLOWED_ORIGINS = [
-        'http://localhost:5173',
-        'http://localhost:5174',
-        'http://localhost:5175',
-        'http://localhost:5176',
-        'http://127.0.0.1:5173',
-        'http://127.0.0.1:5174',
-        'http://127.0.0.1:5175',
-        'http://127.0.0.1:5176',
-    ]
+    CORS_ALLOWED_ORIGINS = local_frontend_origins
 else:
-    CORS_ALLOWED_ORIGINS = [
-        'https://eta.althech.com',
-        'http://localhost:5173',
-    ]
+    CORS_ALLOWED_ORIGINS = ['https://eta.althech.com', *local_frontend_origins]
 
 raw_csrf = env('CSRF_TRUSTED_ORIGINS', default='')
 if raw_csrf:
     CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in raw_csrf.split(',') if origin.strip()]
 elif DEBUG:
-    CSRF_TRUSTED_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173']
+    CSRF_TRUSTED_ORIGINS = local_frontend_origins
 else:
-    CSRF_TRUSTED_ORIGINS = ['https://eta.althech.com']
+    CSRF_TRUSTED_ORIGINS = ['https://eta.althech.com', *local_frontend_origins]
 
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
@@ -247,13 +256,16 @@ CURRENCY_ADMIN_EMAIL = env('CURRENCY_ADMIN_EMAIL', default=DEFAULT_FROM_EMAIL)
 # ============================================================================== 
 FIXER_API_KEY = env('FIXER_API_KEY', default='')
 DEFAULT_CURRENCY = env('DEFAULT_CURRENCY', default='EUR')
-FRANKFURTER_URL = env('FRANKFURTER_URL', default='http://rates:8080')
+FRANKFURTER_URL = env('FRANKFURTER_API_URL', default=env('FRANKFURTER_URL', default='https://api.frankfurter.app'))
 
 # Celery Core Settings
 CELERY_BROKER_URL = env('CELERY_BROKER_URL', default=REDIS_URL)
 CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND', default='django-db')
 CELERY_TIMEZONE = 'Europe/Berlin'
 CELERY_ENABLE_UTC = True
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
 
 # Celery Beat Periodic Schedule
 CELERY_BEAT_SCHEDULE = {

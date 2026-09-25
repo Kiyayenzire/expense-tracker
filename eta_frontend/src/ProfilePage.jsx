@@ -19,7 +19,7 @@ export default function ProfilePage({ token, onLogout, theme, setTheme, onNaviga
   const [selectedImage, setSelectedImage] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
 
-  const apiBase = useMemo(() => import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api', []);
+  const apiBase = useMemo(() => import.meta.env.VITE_API_BASE_URL || 'http://localhost:8002/api', []);
 
   useEffect(() => {
     async function fetchProfile() {

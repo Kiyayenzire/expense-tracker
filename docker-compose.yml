@@ -13,8 +13,6 @@ services:
       start_period: 20s
     volumes:
       - db_data:/var/lib/postgresql/data
-    networks:
-      - internal_network
 
   redis:
     image: redis:7-alpine
@@ -27,8 +25,6 @@ services:
       retries: 5
     volumes:
       - redis_data:/data
-    networks:
-      - internal_network
 
   migration:
     image: ghcr.io/kiyayenzire/eta_backend:latest
@@ -37,24 +33,24 @@ services:
     env_file:
       - .env
     volumes:
-      - staticfiles:/app/staticfiles
+      - ./staticfiles:/app/staticfiles
     depends_on:
       db:
         condition: service_healthy
-    networks:
-      - internal_network
+      redis:
+        condition: service_healthy
 
   backend:
     image: ghcr.io/kiyayenzire/eta_backend:latest
     container_name: eta_backend
     restart: always
     ports:
-      - "127.0.0.1:8002:8000"
+      - "8002:8000"
     env_file:
       - .env
     volumes:
-      - staticfiles:/app/staticfiles
-      - media_data:/app/media
+      - ./staticfiles:/app/staticfiles
+      - ./media:/app/media
     depends_on:
       db:
         condition: service_healthy
@@ -62,9 +58,6 @@ services:
         condition: service_healthy
       migration:
         condition: service_completed_successfully
-    networks:
-      - internal_network
-      - web_network
 
   celery_worker:
     image: ghcr.io/kiyayenzire/eta_backend:latest
@@ -74,7 +67,7 @@ services:
     env_file:
       - .env
     volumes:
-      - media_data:/app/media
+      - ./media:/app/media
     depends_on:
       db:
         condition: service_healthy
@@ -82,8 +75,6 @@ services:
         condition: service_healthy
       migration:
         condition: service_completed_successfully
-    networks:
-      - internal_network
 
   celery_beat:
     image: ghcr.io/kiyayenzire/eta_backend:latest
@@ -99,8 +90,6 @@ services:
         condition: service_healthy
       migration:
         condition: service_completed_successfully
-    networks:
-      - internal_network
 
   frontend:
     image: ghcr.io/kiyayenzire/eta_frontend:latest
@@ -110,18 +99,7 @@ services:
       - "127.0.0.1:3002:5173"
     depends_on:
       - backend
-    networks:
-      - internal_network
-      - web_network
-
-networks:
-  internal_network:
-    driver: bridge
-  web_network:
-    external: true
 
 volumes:
   db_data:
   redis_data:
-  staticfiles:
-  media_data:
