@@ -19,4 +19,3 @@ urlpatterns = [
     path('password/reset/', custom_password_reset_request, name='rest_password_reset'),
     path('password/reset/confirm/', custom_password_reset_confirm, name='rest_password_reset_confirm'),
 ]
-

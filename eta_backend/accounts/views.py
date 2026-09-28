@@ -113,9 +113,10 @@ def custom_password_reset_request(request):
     try:
         user = User.objects.get(email__iexact=email)
     except User.DoesNotExist:
+        # Return 200 OK to prevent email enumeration attacks and satisfy API contract tests
         return Response(
-            {'detail': 'No account was found for this email address. Please create an account or check the email you entered.'},
-            status=status.HTTP_404_NOT_FOUND
+            {'detail': 'If an account exists for this email address, a password reset link has been sent.'},
+            status=status.HTTP_200_OK
         )
     
     # Generate reset token and UID
@@ -149,7 +150,7 @@ Expense Tracker Team
             fail_silently=False,
         )
         return Response(
-            {'detail': 'This email already exists. A reset password link has been sent to this email so you can update your password.'},
+            {'detail': 'If an account exists for this email address, a password reset link has been sent.'},
             status=status.HTTP_200_OK
         )
     except Exception as e:
