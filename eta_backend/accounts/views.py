@@ -115,7 +115,7 @@ def custom_password_reset_request(request):
     except User.DoesNotExist:
         # Return 200 OK to prevent email enumeration attacks and satisfy API contract tests
         return Response(
-            {'detail': 'If an account already exists for this email address, a password reset link has been sent.'},
+            {'detail': 'If an account already exists for this email address, a reset password link has been sent.'},
             status=status.HTTP_200_OK
         )
     
@@ -150,7 +150,7 @@ Expense Tracker Team
             fail_silently=False,
         )
         return Response(
-            {'detail': 'If an account already exists for this email address, a password reset link has been sent.'},
+            {'detail': 'If an account already exists for this email address, a reset password link has been sent.'},
             status=status.HTTP_200_OK
         )
     except Exception as e:
@@ -158,6 +158,7 @@ Expense Tracker Team
             {'detail': f'Error sending reset email: {str(e)}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
