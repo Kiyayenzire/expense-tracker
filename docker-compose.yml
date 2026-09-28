@@ -45,7 +45,7 @@ services:
     container_name: eta_backend
     restart: always
     ports:
-      - "8002:8000"
+      - "127.0.0.1:8002:8000"
     env_file:
       - .env
     volumes:
@@ -93,6 +93,11 @@ services:
 
   frontend:
     image: ghcr.io/kiyayenzire/eta_frontend:latest
+    build:
+      context: ./eta_frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
     container_name: eta_frontend
     restart: always
     ports:
