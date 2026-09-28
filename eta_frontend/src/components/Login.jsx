@@ -28,7 +28,7 @@ function Login({ onLogin }) {
   const [generalError, setGeneralError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8002/api';
+  const apiBase = import.meta.env.VITE_API_BASE_URL || '/api';
 
   const clearErrors = () => {
     setFieldErrors({});
