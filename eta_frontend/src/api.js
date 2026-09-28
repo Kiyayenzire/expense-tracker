@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const rawApiBase = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8002/api').trim();
+// Default fallback to relative '/api' route so Nginx proxies production requests seamlessly
+const rawApiBase = (import.meta.env.VITE_API_BASE_URL || '/api').trim();
 const apiBase = rawApiBase
   .replace(/\/api\/expenses\/?$/i, '/api')
   .replace(/\/expenses\/?$/i, '')
