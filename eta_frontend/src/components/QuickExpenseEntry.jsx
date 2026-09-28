@@ -24,9 +24,9 @@ export function QuickExpenseEntry({ client, onParsed }) {
     <section className="card quick-expense-entry">
       <h2>Quick Expense Entry</h2>
       <p className="small-text">Describe the expense, review the interpretation, then edit or confirm it in the normal form.</p>
-      <form onSubmit={parse} className="quick-expense-form">
+      <form onSubmit={parse} className="quick-expense-form quick-expense-form-row">
         <input aria-label="Quick expense description" value={text} onChange={(event) => setText(event.target.value)} placeholder="I spent 35k at Java House for lunch yesterday" />
-        <button type="submit" disabled={loading || !text.trim()}>{loading ? 'Parsing...' : 'Parse Expense'}</button>
+        <button type="submit" className="primary-action-button" disabled={loading || !text.trim()}>{loading ? 'Parsing...' : 'Parse Expense'}</button>
       </form>
       {error && <p className="alert alert-danger">{error}</p>}
       {result && !result.errors?.length && (
@@ -39,5 +39,6 @@ export function QuickExpenseEntry({ client, onParsed }) {
         </div>
       )}
     </section>
+    
   );
 }

@@ -10,7 +10,7 @@ const initialProfile = {
   profile_picture_url: '',
 };
 
-export default function ProfilePage({ token, onLogout, theme, setTheme, onNavigate, username, profilePicture, setProfilePicture, setUsername }) {
+export default function ProfilePage({ token, onLogout, theme, setTheme, onNavigate, username, profilePicture, setProfilePicture, setUsername, onDeleteAccount }) {
   const [profile, setProfile] = useState(initialProfile);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -132,6 +132,9 @@ export default function ProfilePage({ token, onLogout, theme, setTheme, onNaviga
       setPreviewUrl(nextPicture);
       setSelectedImage(null);
       setSuccess('Profile updated successfully.');
+      window.setTimeout(() => {
+        if (onNavigate) onNavigate('dashboard');
+      }, 250);
     } catch (submitError) {
       setError(submitError.message || 'Unable to save profile changes.');
     } finally {
@@ -158,7 +161,7 @@ export default function ProfilePage({ token, onLogout, theme, setTheme, onNaviga
           ) : (
             <form onSubmit={handleSubmit} className="profile-form">
               <div className="profile-editor-header">
-                <div className="profile-page-picture" style={{ width: '3rem', height: '3rem', flex: '0 0 3rem', overflow: 'hidden', borderRadius: '50%' }}>
+                <div className="profile-page-picture" style={{ width: '2.1rem', height: '2.1rem', flex: '0 0 2.1rem', overflow: 'hidden', borderRadius: '50%' }}>
                   {profileImage ? (
                     <img src={profileImage} alt="Profile" style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
@@ -207,8 +210,10 @@ export default function ProfilePage({ token, onLogout, theme, setTheme, onNaviga
               </div>
 
               <div className="profile-actions">
-                <button type="button" className="secondary-action-button" onClick={() => onNavigate('dashboard')}>Back to dashboard</button>
                 <button type="submit" className="primary-action-button" disabled={saving}>{saving ? 'Saving…' : 'Save profile'}</button>
+                {onDeleteAccount && (
+                  <button type="button" className="danger-action-button" onClick={onDeleteAccount}>Delete account</button>
+                )}
               </div>
             </form>
           )}

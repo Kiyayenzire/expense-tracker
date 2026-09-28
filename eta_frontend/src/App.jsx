@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+
+// View & Component Imports
 import Login from './components/Login';
 import Dashboard from './Dashboard';
 import AddExpensePage from './AddExpensePage';
@@ -10,6 +12,9 @@ import ProfilePage from './ProfilePage';
 import SpendingTrendsPage from './SpendingTrendsPage';
 import { AppShell } from './components/AppShell';
 
+// ---------------------------------------------------------------------------
+// LOCAL STORAGE KEYS & ROUTING HELPERS
+// ---------------------------------------------------------------------------
 const STORAGE_KEY = 'expense-tracker-token';
 const THEME_KEY = 'expense-tracker-theme';
 const USERNAME_KEY = 'expense-tracker-username';
@@ -17,14 +22,22 @@ const PROFILE_PICTURE_KEY = 'expense-tracker-profile-picture';
 const getPageFromHash = () => window.location.hash.replace('#/', '') || 'dashboard';
 
 function App() {
+  // ---------------------------------------------------------------------------
+  // 1. STATE MANAGEMENT
+  // ---------------------------------------------------------------------------
   const [token, setToken] = useState(localStorage.getItem(STORAGE_KEY));
   const [username, setUsername] = useState(localStorage.getItem(USERNAME_KEY) || 'User');
   const [profilePicture, setProfilePicture] = useState(localStorage.getItem(PROFILE_PICTURE_KEY) || '');
-  const [theme, setTheme] = useState(localStorage.getItem(THEME_KEY) || 'light');
+  const [theme, setTheme] = useState(() => localStorage.getItem(THEME_KEY) || 'light');
   const [displayCurrency, setDisplayCurrency] = useState('EUR');
   const [page, setPage] = useState(getPageFromHash);
   const [deleteFlow, setDeleteFlow] = useState({ isOpen: false, password: '', error: '' });
 
+  // ---------------------------------------------------------------------------
+  // 2. SIDE EFFECTS (Routing, Theme Sync, Profile Data)
+  // ---------------------------------------------------------------------------
+
+  // Effect: Sync state with browser URL hash changes (Back/Forward navigation)
   useEffect(() => {
     const syncPage = () => setPage(getPageFromHash());
     window.addEventListener('hashchange', syncPage);
@@ -35,12 +48,15 @@ function App() {
     };
   }, []);
 
+  // Effect: Apply theme attribute to html/body elements & update local storage
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    document.body.setAttribute('data-theme', theme);
-    localStorage.setItem(THEME_KEY, theme);
-  }, [theme]);
+    const nextTheme = token ? theme : 'light';
+    document.documentElement.setAttribute('data-theme', nextTheme);
+    document.body.setAttribute('data-theme', nextTheme);
+    localStorage.setItem(THEME_KEY, nextTheme);
+  }, [token, theme]);
 
+  // Effect: Fetch active user profile details when authenticated
   useEffect(() => {
     if (!token) return;
 
@@ -68,9 +84,13 @@ function App() {
         setProfilePicture(nextPicture);
       })
       .catch(() => {
-        // Keep the existing local user info if the profile endpoint is unavailable.
+        // Keep existing local user info if profile endpoint is unreachable
       });
   }, [token]);
+
+  // ---------------------------------------------------------------------------
+  // 3. ACTION HANDLERS & NAVIGATION
+  // ---------------------------------------------------------------------------
 
   function handleLogin(jwtToken, loggedInUsername = '', profileImage = '') {
     const sourceUsername = loggedInUsername || localStorage.getItem(USERNAME_KEY) || username || 'User';
@@ -93,6 +113,7 @@ function App() {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(USERNAME_KEY);
     localStorage.removeItem(PROFILE_PICTURE_KEY);
+    setTheme('light');
     setToken(null);
     setUsername('User');
     setProfilePicture('');
@@ -145,6 +166,7 @@ function App() {
     setPage(nextPage);
   }
 
+  // Active page router selection
   const dashboardView = (
     <>
       {deleteFlow.isOpen && (
@@ -178,34 +200,59 @@ function App() {
         </div>
       )}
 
-      {page === 'profile' ? <ProfilePage token={token} onLogout={handleLogout} onNavigate={navigate} username={username} profilePicture={profilePicture} setProfilePicture={setProfilePicture} setUsername={setUsername} />
-        : page === 'add-expense' ? <AddExpensePage token={token} onLogout={handleLogout} onNavigate={navigate} />
-          : page === 'expenses' ? <ExpensesPage token={token} onLogout={handleLogout} onNavigate={navigate} displayCurrency={displayCurrency} />
-            : page === 'reports' ? <ReportsPage token={token} onLogout={handleLogout} displayCurrency={displayCurrency} />
-              : page === 'spending-trends' ? <SpendingTrendsPage token={token} onLogout={handleLogout} displayCurrency={displayCurrency} />
-              : page === 'insights' ? <InsightsPage token={token} onLogout={handleLogout} displayCurrency={displayCurrency} />
-                : ['daily', 'weekly', 'monthly', 'quarterly', 'annual'].includes(page) ? <PeriodSummaryPage period={page} token={token} onLogout={handleLogout} displayCurrency={displayCurrency} />
-                : <Dashboard token={token} onLogout={handleLogout} theme={theme} setTheme={setTheme} onNavigate={navigate} onDeleteAccount={openDeleteAccountFlow} username={username} profilePicture={profilePicture} />}
-    </>
-  );
-
-  return token
-    ? page === 'dashboard'
-      ? dashboardView
-      : <AppShell
+      {page === 'profile' ? (
+        <ProfilePage
           token={token}
           onLogout={handleLogout}
-          theme={theme}
-          setTheme={setTheme}
+          onDeleteAccount={openDeleteAccountFlow}
           onNavigate={navigate}
           username={username}
           profilePicture={profilePicture}
-          displayCurrency={displayCurrency}
-          setDisplayCurrency={setDisplayCurrency}
-        >
-          {dashboardView}
-        </AppShell>
-    : <Login onLogin={handleLogin} />;
+          setProfilePicture={setProfilePicture}
+          setUsername={setUsername}
+        />
+      ) : page === 'add-expense' ? (
+        <AddExpensePage token={token} onLogout={handleLogout} onNavigate={navigate} />
+      ) : page === 'expenses' ? (
+        <ExpensesPage token={token} onLogout={handleLogout} onNavigate={navigate} displayCurrency={displayCurrency} />
+      ) : page === 'reports' ? (
+        <ReportsPage token={token} onLogout={handleLogout} displayCurrency={displayCurrency} />
+      ) : page === 'spending-trends' ? (
+        <SpendingTrendsPage token={token} onLogout={handleLogout} displayCurrency={displayCurrency} />
+      ) : page === 'insights' ? (
+        <InsightsPage token={token} onLogout={handleLogout} displayCurrency={displayCurrency} />
+      ) : ['daily', 'weekly', 'monthly', 'quarterly', 'annual'].includes(page) ? (
+        <PeriodSummaryPage period={page} token={token} onLogout={handleLogout} displayCurrency={displayCurrency} />
+      ) : (
+        <Dashboard token={token} onLogout={handleLogout} theme={theme} setTheme={setTheme} onNavigate={navigate} onDeleteAccount={openDeleteAccountFlow} username={username} profilePicture={profilePicture} />
+      )}
+    </>
+  );
+
+  // ---------------------------------------------------------------------------
+  // 4. MAIN APPLICATION VIEW
+  // ---------------------------------------------------------------------------
+  return token ? (
+    page === 'dashboard' ? (
+      dashboardView
+    ) : (
+      <AppShell
+        token={token}
+        onLogout={handleLogout}
+        theme={theme}
+        setTheme={setTheme}
+        onNavigate={navigate}
+        username={username}
+        profilePicture={profilePicture}
+        displayCurrency={displayCurrency}
+        setDisplayCurrency={setDisplayCurrency}
+      >
+        {dashboardView}
+      </AppShell>
+    )
+  ) : (
+    <Login onLogin={handleLogin} />
+  );
 }
 
 export default App;

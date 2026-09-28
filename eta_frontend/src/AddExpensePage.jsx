@@ -28,17 +28,21 @@ export default function AddExpensePage({ token, onLogout, onNavigate }) {
         </div>
         {dashboard.error && <div className="alert alert-danger">{dashboard.error}</div>}
         {feedback && <div className="alert alert-success">{feedback}</div>}
-        <QuickExpenseEntry client={client} onParsed={setQuickDraft} />
-        <ExpenseForm
-          categories={dashboard.categories}
-          subcategories={dashboard.subcategories}
-          items={dashboard.items}
-          currencies={dashboard.currencies}
-          client={client}
-          onSuccess={handleSuccess}
-          onError={setFeedback}
-          quickDraft={quickDraft}
-        />
+        <div className="page-section">
+          <QuickExpenseEntry client={client} onParsed={setQuickDraft} />
+        </div>
+        <div className="page-section">
+          <ExpenseForm
+            categories={dashboard.categories}
+            subcategories={dashboard.subcategories}
+            items={dashboard.items}
+            currencies={dashboard.currencies}
+            client={client}
+            onSuccess={handleSuccess}
+            onError={setFeedback}
+            quickDraft={quickDraft}
+          />
+        </div>
     </div>
   );
 }

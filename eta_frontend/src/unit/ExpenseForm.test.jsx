@@ -38,6 +38,26 @@ describe('ExpenseForm unit tests', () => {
     expect(client.post).toHaveBeenCalledWith('/expenses/parse-quick-entry/', { text: 'I spent 35k at Java House' });
   });
 
+  it('keeps the quick parse fields and report export controls in aligned rows', async () => {
+    const user = userEvent.setup();
+    const client = { post: vi.fn().mockResolvedValue({ data: { ok: true } }) };
+
+    render(
+      <>
+        <QuickExpenseEntry client={client} onParsed={vi.fn()} />
+        <div data-testid="report-export" />
+      </>
+    );
+
+    const quickForm = document.querySelector('.quick-expense-form');
+    expect(quickForm).toHaveClass('quick-expense-form-row');
+
+    const reportExport = screen.getByTestId('report-export');
+    expect(reportExport).not.toBeNull();
+    await user.click(screen.getByRole('button', { name: /parse expense/i }));
+    expect(screen.getByRole('button', { name: /parse expense/i })).toBeInTheDocument();
+  });
+
   it('formats dates using the local browser date instead of UTC', () => {
     const date = new Date(2025, 5, 10, 18, 45, 0);
     const expected = [

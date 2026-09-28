@@ -53,8 +53,8 @@ docker compose --env-file .env.dev up -d --build
 ```
 
 3. Open the app:
-   - Frontend: http://localhost:5173
-   - Backend API: http://localhost:8000/api
+   - Frontend: http://localhost:5174
+   - Backend API: http://localhost:8002/api
 
 4. Create an admin or superuser if required:
 
@@ -65,7 +65,7 @@ docker compose --env-file .env.dev exec backend python manage.py createsuperuser
 5. Open the admin panel at:
 
 ```text
-http://127.0.0.1:8000/etaalthech2026/
+http://127.0.0.1:8002/etaalthech2026/
 ```
 
 ## Environment configuration
@@ -100,7 +100,7 @@ The project uses a custom admin route set by `DJANGO_ADMIN_URL`.
 In the default local setup this is:
 
 ```text
-http://127.0.0.1:8000/etaalthech2026/
+http://127.0.0.1:8002/etaalthech2026/
 ```
 
 Use this route for direct Django admin access and currency-rate management.
@@ -147,11 +147,11 @@ If using Nginx in front of the app, the project includes configuration under `ng
 
 ## Local development notes
 
-- The frontend runs in Vite on port 5173.
-- The backend runs Django on port 8000.
-- Redis handles Celery messaging and background tasks.
-- PostgreSQL is used as the primary database.
-- Celery worker and Celery beat run as part of the same Docker stack.
+- The frontend runs in Vite on port 5174 for the local workstation setup.
+- The backend runs Django on port 8002.
+- PostgreSQL is the default development database for the project and is served through the Docker stack.
+- Redis handles Celery messaging and background tasks through the same Docker environment.
+- Celery worker and Celery beat run as part of the same Docker stack when needed.
 
 ## Important implementation notes
 
@@ -210,7 +210,7 @@ The repository does not currently declare a formal license file. Check the proje
 2. Create `.env` from `.env.dev`.
 3. Run `docker compose -f docker-compose.dev.yml up --build`.
 4. Seed initial data and create a superuser.
-5. Open `http://localhost:5173` and login.
+5. Open `http://localhost:5174` and login.
 
 If you need a token-based login for API access, use the `/api/auth/login/` endpoint with your username and password.
 

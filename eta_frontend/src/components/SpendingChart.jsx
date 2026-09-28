@@ -25,8 +25,8 @@ export function SpendingChart({ chartData = {}, symbol = '€' }) {
       <div className="chart-wrapper">
         <ResponsiveContainer width="100%" height={320}>
           <BarChart data={formattedChart}>
-            <XAxis dataKey="name" axisLine={false} tickLine={false} />
-            <YAxis axisLine={false} tickLine={false} />
+            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#F5F5F5', fontSize: 12 }} />
+            <YAxis axisLine={false} tickLine={false} tick={{ fill: '#F5F5F5', fontSize: 12 }} />
             <Tooltip formatter={(val) => `${symbol} ${Number(val).toFixed(2)}`} />
             <Bar dataKey="total" fill="#3B3B3D" radius={[4, 4, 0, 0]} />
           </BarChart>

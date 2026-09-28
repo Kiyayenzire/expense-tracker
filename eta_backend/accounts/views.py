@@ -31,11 +31,15 @@ def custom_login(request):
 
     user = User.objects.filter(username__iexact=username).first() or User.objects.filter(email__iexact=username).first()
     if not user:
-        return Response({'detail': 'Invalid credentials.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            'detail': 'Username/email not found. Please check it and try again or create a new account.'
+        }, status=status.HTTP_400_BAD_REQUEST)
 
     auth_user = authenticate(request, username=user.username, password=password)
     if not auth_user:
-        return Response({'detail': 'Invalid credentials.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            'detail': 'Password is incorrect for this account. Please try again or use the reset password link.'
+        }, status=status.HTTP_400_BAD_REQUEST)
 
     django_login(request, auth_user)
     token, _ = Token.objects.get_or_create(user=auth_user)
@@ -107,12 +111,11 @@ def custom_password_reset_request(request):
         )
     
     try:
-        user = User.objects.get(email=email)
+        user = User.objects.get(email__iexact=email)
     except User.DoesNotExist:
-        # For security, don't reveal if email exists
         return Response(
-            {'detail': 'If an account with this email exists, a reset link has been sent.'},
-            status=status.HTTP_200_OK
+            {'detail': 'No account was found for this email address. Please create an account or check the email you entered.'},
+            status=status.HTTP_404_NOT_FOUND
         )
     
     # Generate reset token and UID
@@ -146,7 +149,7 @@ Expense Tracker Team
             fail_silently=False,
         )
         return Response(
-            {'detail': 'If an account with this email exists, a reset link has been sent.'},
+            {'detail': 'This email already exists. A reset password link has been sent to this email so you can update your password.'},
             status=status.HTTP_200_OK
         )
     except Exception as e:

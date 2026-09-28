@@ -40,9 +40,28 @@ class TestAccountsUserFlow:
         assert patch_response.status_code == status.HTTP_200_OK
         assert patch_response.json()['first_name'] == 'New'
 
-    def test_password_reset_flow(self, api_client, test_user):
+    def test_login_reports_username_and_password_failures_exactly(self, api_client, test_user):
+        missing_user_response = api_client.post(
+            '/api/auth/login/',
+            {'username': 'does-not-exist@example.com', 'password': 'WrongPassword123!'},
+            format='json',
+        )
+        assert missing_user_response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'not found' in missing_user_response.json()['detail'].lower()
+
+        wrong_password_response = api_client.post(
+            '/api/auth/login/',
+            {'username': 'test@example.com', 'password': 'WrongPassword123!'},
+            format='json',
+        )
+        assert wrong_password_response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'password is incorrect' in wrong_password_response.json()['detail'].lower()
+
+    def test_password_reset_flow_informs_existing_email(self, api_client, test_user):
         response = api_client.post('/api/auth/password/reset/', {'email': 'test@example.com'})
         assert response.status_code == status.HTTP_200_OK
+        assert 'already exists' in response.json()['detail'].lower()
+        assert 'reset password' in response.json()['detail'].lower()
 
     def test_delete_account_flow(self, authenticated_client, test_user):
         response = authenticated_client.post('/api/auth/delete-account/', {'password': 'testpass123'})

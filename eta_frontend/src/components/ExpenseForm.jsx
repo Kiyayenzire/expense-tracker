@@ -115,72 +115,82 @@ export function ExpenseForm({ categories, subcategories, items, currencies, clie
       </div>
       {!isOnline && <p className="small-text text-warning mb-2">You're offline. Expenses will be saved locally and sync automatically when you reconnect.</p>}
       <form onSubmit={handleSubmit} className="expense-form">
-        <div className="form-group expense-field expense-field-date">
-          <label>Date (DD/MM/YYYY)</label>
-          <input type="date" className="form-control" title="Choose a date; it is displayed as DD/MM/YYYY" value={form.date} onChange={(e) => handleChange('date', e.target.value)} required />
+        <div className="expense-row expense-row-primary">
+          <div className="form-group expense-field expense-field-date">
+            <label>Date (DD/MM/YYYY)</label>
+            <input type="date" className="form-control" title="Choose a date; it is displayed as DD/MM/YYYY" value={form.date} onChange={(e) => handleChange('date', e.target.value)} required />
+          </div>
+
+          <div className="form-group expense-field expense-field-category">
+            <label htmlFor="expense-category">Category</label>
+            <select id="expense-category" className="form-control" value={form.category} onChange={(e) => handleCategoryChange(e.target.value)} required>
+              <option value="">Select Category</option>
+              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+
+          <div className="form-group expense-field expense-field-subcategory">
+            <label htmlFor="expense-subcategory">Subcategory</label>
+            <select id="expense-subcategory" className="form-control" value={form.subcategory} onChange={(e) => handleSubcategoryChange(e.target.value)} disabled={!form.category} required>
+              <option value="">{form.category ? 'Select Subcategory' : 'Select Category first'}</option>
+              {categorySubcategories.map((subcategory) => <option key={subcategory.id} value={subcategory.id}>{subcategory.name}</option>)}
+            </select>
+          </div>
+
+          <div className="form-group expense-field expense-field-currency">
+            <label htmlFor="expense-currency">Currency</label>
+            <select id="expense-currency" className="form-control" value={form.currency} onChange={(e) => handleChange('currency', e.target.value)}>
+              {currencies.map((c) => <option key={c.id} value={c.id}>{c.symbol} {c.code}</option>)}
+            </select>
+          </div>
         </div>
 
-        <div className="form-group expense-field expense-field-category">
-          <label htmlFor="expense-category">Category</label>
-          <select id="expense-category" className="form-control" value={form.category} onChange={(e) => handleCategoryChange(e.target.value)} required>
-            <option value="">Select Category</option>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </div>
-        <div className="form-group expense-field expense-field-subcategory">
-          <label htmlFor="expense-subcategory">Subcategory</label>
-          <select id="expense-subcategory" className="form-control" value={form.subcategory} onChange={(e) => handleSubcategoryChange(e.target.value)} disabled={!form.category} required>
-            <option value="">{form.category ? 'Select Subcategory' : 'Select Category first'}</option>
-            {categorySubcategories.map((subcategory) => <option key={subcategory.id} value={subcategory.id}>{subcategory.name}</option>)}
-          </select>
-        </div>
-        <div className="form-group expense-field expense-field-description">
-          <label htmlFor="expense-description">Expense Description</label>
-          <input id="expense-description" className="form-control" value={form.itemDescription} onChange={(e) => handleChange('itemDescription', e.target.value)} placeholder={form.subcategory ? `e.g. ${suggestedDescription}` : 'Select Subcategory first'} disabled={!form.subcategory} required />
-          <span className="small-text field-hint">Example only: {suggestedDescription || 'enter your own final description'}. Type your complete description here.</span>
+        <div className="expense-row expense-row-description">
+          <div className="form-group expense-field expense-field-description">
+            <label htmlFor="expense-description">Expense Description</label>
+            <input id="expense-description" className="form-control" value={form.itemDescription} onChange={(e) => handleChange('itemDescription', e.target.value)} placeholder={form.subcategory ? `e.g. ${suggestedDescription}` : 'Select Subcategory first'} disabled={!form.subcategory} required />
+            <span className="small-text field-hint">Example only: {suggestedDescription || 'enter your own final description'}. Type your complete description here.</span>
+          </div>
+
+          <div className="form-group expense-field expense-field-measurement">
+            <label htmlFor="measurement">Measurement</label>
+            <select id="measurement" className="form-control" value={form.measurement} onChange={(e) => handleChange('measurement', e.target.value)}>
+              {MEASUREMENT_CHOICES.map((choice) => (
+                <option key={choice.value} value={choice.value}>{choice.label}</option>
+              ))}
+            </select>
+            <span className="small-text field-hint">Suggested measurement: {suggestedMeasurement}. You can change it.</span>
+          </div>
         </div>
 
-        <div className="form-group expense-field expense-field-measurement">
-          <label htmlFor="measurement">Measurement</label>
-          <select id="measurement" className="form-control" value={form.measurement} onChange={(e) => handleChange('measurement', e.target.value)}>
-            {MEASUREMENT_CHOICES.map((choice) => (
-              <option key={choice.value} value={choice.value}>{choice.label}</option>
-            ))}
-          </select>
-          <span className="small-text field-hint">Suggested measurement: {suggestedMeasurement}. You can change it.</span>
+        <div className="expense-row expense-row-amounts">
+          <div className="form-group expense-field expense-field-amount">
+            <label htmlFor="expense-amount">Amount (e.g. 125.50)</label>
+            <input id="expense-amount" type="number" step="0.01" min="0" placeholder="Enter amount" className="form-control" value={form.amount} onChange={(e) => handleChange('amount', e.target.value)} required />
+          </div>
+
+          <div className="form-group expense-field expense-field-quantity">
+            <label htmlFor="expense-quantity">Quantity (e.g. 1)</label>
+            <input id="expense-quantity" type="number" step="0.01" min="0" placeholder="Enter quantity" className="form-control" value={form.quantity} onChange={(e) => handleChange('quantity', e.target.value)} required />
+          </div>
+
+          <div className="form-group expense-field expense-field-supplier">
+            <label htmlFor="expense-supplier">Supplier / Provider (optional)</label>
+            <input id="expense-supplier" className="form-control" placeholder="e.g. Local market" value={form.supplier} onChange={(e) => handleChange('supplier', e.target.value)} />
+          </div>
+
+          <div className="form-group expense-field expense-field-country">
+            <label htmlFor="expense-country">Country (optional)</label>
+            <input id="expense-country" className="form-control" placeholder="e.g. Uganda" value={form.country} onChange={(e) => handleChange('country', e.target.value)} />
+          </div>
         </div>
 
-        <div className="form-group expense-field expense-field-amount">
-          <label htmlFor="expense-amount">Amount (e.g. 125.50)</label>
-          <input id="expense-amount" type="number" step="0.01" min="0" placeholder="Enter amount" className="form-control" value={form.amount} onChange={(e) => handleChange('amount', e.target.value)} required />
-        </div>
-        <div className="form-group expense-field expense-field-currency">
-          <label htmlFor="expense-currency">Currency</label>
-          <select id="expense-currency" className="form-control" value={form.currency} onChange={(e) => handleChange('currency', e.target.value)}>
-            {currencies.map((c) => <option key={c.id} value={c.id}>{c.symbol} {c.code}</option>)}
-          </select>
-        </div>
-
-        <div className="form-group expense-field expense-field-quantity">
-          <label htmlFor="expense-quantity">Quantity (e.g. 1)</label>
-          <input id="expense-quantity" type="number" step="0.01" min="0" placeholder="Enter quantity" className="form-control" value={form.quantity} onChange={(e) => handleChange('quantity', e.target.value)} required />
-        </div>
-        <div className="form-group expense-field expense-field-supplier">
-          <label htmlFor="expense-supplier">Supplier / Provider (optional)</label>
-          <input id="expense-supplier" className="form-control" placeholder="e.g. Local market" value={form.supplier} onChange={(e) => handleChange('supplier', e.target.value)} />
-        </div>
-
-        <div className="form-group expense-field expense-field-country">
-          <label htmlFor="expense-country">Country (optional)</label>
-          <input id="expense-country" className="form-control" placeholder="e.g. Uganda" value={form.country} onChange={(e) => handleChange('country', e.target.value)} />
-        </div>
-
-        <div className="form-group expense-field expense-field-notes">
+        <div className="form-group expense-field expense-field-notes full-width-field">
           <label>Notes (optional)</label>
           <textarea className="form-control" placeholder="Add useful details" value={form.notes} onChange={(e) => handleChange('notes', e.target.value)} rows={2} />
         </div>
 
-        <button className="btn btn-primary w-100" type="submit" disabled={submitting}>
+        <button className="primary-action-button w-100" type="submit" disabled={submitting}>
           {submitting ? 'Saving...' : 'Save Expense'}
         </button>
       </form>
