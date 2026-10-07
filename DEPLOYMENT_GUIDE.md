@@ -103,6 +103,8 @@ For production, replace the dev values with secure credentials and a real secret
 docker compose --env-file .env.dev exec backend pytest -q
 ```
 
+Backend tests use Django's in-memory cache through an autouse pytest fixture and execute Celery tasks eagerly, so tests do not require a Redis broker. These overrides apply only during tests; the application continues to use Redis and asynchronous Celery workers at runtime. Expense and currency querysets used in API responses have explicit ordering where response order matters.
+
 ### Frontend
 
 ```bash
@@ -420,7 +422,7 @@ The deployment job uses the run's `GITHUB_TOKEN` to pull images from GHCR. Grant
 ## Support & Documentation
 
 - **API Documentation**: http://localhost:8000/api/docs/ (with Swagger UI)
-- **Django Admin**: http://localhost:8000/admin/
+- **Django Admin**: http://127.0.0.1:8000/etaalthech2026/
 - **Project README**: See README.md
 - **Architecture**: See docs/ARCHITECTURE.md
 

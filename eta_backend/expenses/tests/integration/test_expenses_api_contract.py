@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 import pytest
@@ -17,6 +17,8 @@ class TestExpenseEntryAPIContract:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert isinstance(data, list)
+        dates = [datetime.strptime(entry['date'], '%d/%m/%Y').date() for entry in data]
+        assert dates == sorted(dates, reverse=True)
 
     def test_create_expense_requires_auth(self, api_client, category, item, currency):
         payload = {
@@ -118,6 +120,17 @@ class TestSummaryAPIContract:
 @pytest.mark.integration
 @pytest.mark.django_db
 class TestCurrencyConversionAPIContract:
+    def test_currency_list_is_ordered_by_code(self, authenticated_client, db):
+        from expenses.models import Currency
+
+        Currency.objects.create(code='USD', name='US Dollar', symbol='$')
+        Currency.objects.create(code='EUR', name='Euro', symbol='€')
+
+        response = authenticated_client.get('/api/currencies/')
+
+        assert response.status_code == status.HTTP_200_OK
+        assert [currency['code'] for currency in response.json()] == ['EUR', 'USD']
+
     def test_convert_currency_requires_auth(self, api_client):
         response = api_client.get('/api/convert-currency/?base=EUR&target=USD&amount=100')
         assert response.status_code == status.HTTP_401_UNAUTHORIZED

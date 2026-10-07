@@ -73,7 +73,7 @@ class ItemViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class CurrencyViewSet(viewsets.ModelViewSet):
-    queryset = Currency.objects.filter(is_active=True)
+    queryset = Currency.objects.filter(is_active=True).order_by('code')
     serializer_class = CurrencySerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -100,7 +100,7 @@ class ExpenseEntryViewSet(viewsets.ModelViewSet):
         # All users, including staff, see only their own expenses
         return ExpenseEntry.objects.filter(user=user).select_related(
             'category', 'item', 'currency', 'subcategory'
-        )
+        ).order_by('-date', '-created_at')
 
     def perform_create(self, serializer):
         """Create expense and assign it to the current user."""
