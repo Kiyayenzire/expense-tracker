@@ -7,6 +7,7 @@ This guide reflects the project as it exists in this repository today. The activ
 - Local app: http://localhost:5173
 - Django API: http://localhost:8000/api
 - Admin route: http://127.0.0.1:8000/etaalthech2026/
+- Django Admin signs out after 11 minutes without user activity; this does not change application-user session expiry.
 - Database: PostgreSQL inside Docker
 - Cache/Broker: Redis inside Docker
 - Background jobs: Celery worker + Celery beat
@@ -67,10 +68,14 @@ docker compose --env-file .env.dev logs -f celery_worker
 The repository is designed to run with the root Compose file and an environment file. For production, set up a secure `.env` or `.env.prod` file before starting the stack.
 
 ```bash
-docker compose --env-file .env up -d --build
+docker compose -f docker-compose.yml --env-file .env up -d --build
 ```
 
-The app is also configured to work behind Nginx. The reverse proxy file is in `nginx/nginx.prod.conf`.
+Production uses the existing host reverse proxy and the server's Compose configuration: Django is published at `127.0.0.1:8002`, and the frontend at `127.0.0.1:3002`. The host proxy must send `/api/`, `/accounts/`, and the configured Django Admin path to port `8002`; normal website routes go to port `3002`.
+
+After CI passes on a push to `main`, the same workflow publishes images and deploys the exact tested commit using a temporary Compose override. It does not copy or replace the server's `docker-compose.yml` or Nginx files, and does not remove or recreate persistent volumes. The run is green only if post-deployment checks confirm the website, `/api/auth/options/`, and the Django Admin login page respond as expected.
+
+The frontend Help & Support page sends email to `irislee.8154@gmail.com`. Override `VITE_SUPPORT_EMAIL` in the frontend environment or GitHub Actions repository variables only if the support address changes.
 
 ## Environment variables
 
@@ -172,17 +177,9 @@ cp .env.prod.example .env.prod
 nano .env.prod
 ```
 
-#### Step 3: Configure Nginx
+#### Step 3: Configure the HTTPS ingress
 Create `/etc/nginx/sites-available/eta`:
 ```nginx
-upstream django_backend {
-    server localhost:8000;
-}
-
-upstream react_frontend {
-    server localhost:5173;
-}
-
 server {
     listen 80;
     server_name yourdomain.com www.yourdomain.com;
@@ -202,22 +199,15 @@ server {
     ssl_ciphers HIGH:!aNULL:!MD5;
     ssl_prefer_server_ciphers on;
 
-    # API
-    location /api/ {
-        proxy_pass http://django_backend;
+    # Route normal website requests to the frontend.
+    location / {
+        proxy_pass http://127.0.0.1:3002;
+        proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         client_max_body_size 10M;
-    }
-
-    # Frontend
-    location / {
-        proxy_pass http://react_frontend;
-        proxy_set_header Host $host;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
     }
 }
 ```
@@ -246,11 +236,11 @@ cd /root/eta
 cp .env.prod .env
 
 # Start services in background
-nohup docker compose -f docker-compose.prod.yml up -d > docker.log 2>&1 &
+nohup docker compose -f docker-compose.yml --env-file .env up -d > docker.log 2>&1 &
 
 # Verify services
-docker compose -f docker-compose.prod.yml ps
-curl http://localhost:8000/api/categories/  # Should return JSON
+docker compose -f docker-compose.yml --env-file .env ps
+curl http://127.0.0.1:3002/api/categories/  # Check the Compose Nginx route
 ```
 
 #### Step 6: Setup Automatic Backups
@@ -282,8 +272,8 @@ crontab -e
 #### Step 7: Setup Monitoring
 ```bash
 # View logs
-docker compose -f docker-compose.prod.yml logs -f backend
-docker compose -f docker-compose.prod.yml logs -f celery_worker
+docker compose -f docker-compose.yml --env-file .env logs -f backend
+docker compose -f docker-compose.yml --env-file .env logs -f celery_worker
 
 # Monitor resources
 docker stats
@@ -309,31 +299,31 @@ docker exec eta-redis-1 redis-cli ping
 
 #### Create Admin User
 ```bash
-docker compose -f docker-compose.prod.yml exec backend python manage.py createsuperuser
+docker compose -f docker-compose.yml --env-file .env exec backend python manage.py createsuperuser
 ```
 
 #### Clear Database Cache
 ```bash
-docker compose -f docker-compose.prod.yml exec redis redis-cli FLUSHDB
+docker compose -f docker-compose.yml --env-file .env exec redis redis-cli FLUSHDB
 ```
 
 #### Update Currency Rates
 ```bash
 # Manual trigger (normally runs Monday 17:00 UTC)
-docker compose -f docker-compose.prod.yml exec backend python manage.py shell
+docker compose -f docker-compose.yml --env-file .env exec backend python manage.py shell
 >>> from expenses.tasks import update_currency_rates
 >>> update_currency_rates.delay()
 ```
 
 #### Restart Services
 ```bash
-docker compose -f docker-compose.prod.yml restart
+docker compose -f docker-compose.yml --env-file .env restart
 ```
 
 ### Scaling
 
 #### Increase Celery Workers
-Edit `docker-compose.prod.yml`:
+Edit `docker-compose.yml`:
 ```yaml
 celery_worker:
   # ... existing config ...
@@ -414,18 +404,16 @@ gunzip < eta_backup_20240101.sql.gz | docker compose exec -T db psql -U etauser 
 
 ## CI/CD Pipeline
 
-GitHub Actions automatically:
-1. Runs tests on push
-2. Builds Docker images
-3. Pushes to GHCR
-4. Can deploy to DigitalOcean on merge to main
+GitHub Actions automatically runs backend, frontend, and browser tests for pushes and pull requests. On a successful push to `main`, it builds and pushes the backend and frontend images to GHCR, deploys the exact commit-tagged images over SSH, then verifies the public production routes.
 
 ### GitHub Secrets to Configure
 ```
-REGISTRY_USERNAME: your-github-username
-REGISTRY_PASSWORD: your-github-token
-DIGITALOCEAN_TOKEN: your-do-api-token
+DROPLET_IP: production server IP or hostname
+DROPLET_USER: SSH deployment user
+DROPLET_SSH_KEY: private SSH key for that user
 ```
+
+The deployment job uses the run's `GITHUB_TOKEN` to pull images from GHCR. Grant the repository read access to both container packages. Keep the server's `.env`, Compose file, Nginx configuration, TLS setup, and existing port mappings in place.
 
 ---
 

@@ -9,7 +9,13 @@ const formatFieldError = (error) => {
   return Array.isArray(error) ? error.join(' ') : error;
 };
 
-function Login({ onLogin }) {
+const getApiErrorMessage = (data, fallback) => {
+  if (data?.detail) return formatFieldError(data.detail);
+  const firstMessage = Object.values(data || {}).flat().find((value) => typeof value === 'string');
+  return firstMessage || fallback;
+};
+
+function Login({ onLogin, onNavigate }) {
   const [isRegistering, setIsRegistering] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [resetStep, setResetStep] = useState('request'); // 'request' or 'confirm'
@@ -22,6 +28,14 @@ function Login({ onLogin }) {
   const [resetToken, setResetToken] = useState('');
   const [resetPassword, setResetPassword] = useState('');
   const [resetConfirmPassword, setResetConfirmPassword] = useState('');
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState('');
+  const [verificationStatus, setVerificationStatus] = useState('idle');
+  const [resendingVerification, setResendingVerification] = useState(false);
+  const [authOptions, setAuthOptions] = useState({
+    providers: { google: { configured: false, url: '' }, apple: { configured: false, url: '' } },
+    support: { email: '', phone: '' },
+  });
+  const [authOptionsStatus, setAuthOptionsStatus] = useState('loading');
   
   // Field-specific errors object and general fallback error
   const [fieldErrors, setFieldErrors] = useState({});
@@ -35,6 +49,15 @@ function Login({ onLogin }) {
     setGeneralError('');
     setSuccess('');
   };
+
+  useEffect(() => {
+    axios.get(`${apiBase}/auth/options/`)
+      .then((response) => {
+        setAuthOptions((current) => ({ ...current, ...response.data }));
+        setAuthOptionsStatus('ready');
+      })
+      .catch(() => setAuthOptionsStatus('error'));
+  }, [apiBase]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -74,20 +97,29 @@ function Login({ onLogin }) {
         password2: confirmPassword.trim(),
       });
 
-      setSuccess('Account created successfully. Please log in.');
+      setPendingVerificationEmail(normalizedEmail);
       setIsRegistering(false);
       setPassword('');
       setConfirmPassword('');
+      setSuccess('');
     } catch (signupError) {
       const data = signupError.response?.data || {};
-
+      if (data.verification_pending) {
+        setPendingVerificationEmail(data.email || normalizedEmail);
+        setIsRegistering(false);
+        setGeneralError(getApiErrorMessage(data, 'Your account is pending email verification.'));
+        return;
+      }
       if (typeof data === 'object' && !Array.isArray(data)) {
         setFieldErrors(data);
-        if (data.detail) {
-          setGeneralError(data.detail);
+        const emailError = formatFieldError(data.email);
+        if (emailError && /already|registered|exists/i.test(emailError)) {
+          setGeneralError('This email address is already registered. Sign in or use Forgot password.');
+        } else {
+          setGeneralError(getApiErrorMessage(data, 'Registration could not be completed. Check the highlighted fields and try again.'));
         }
       } else {
-        setGeneralError('Registration failed. Please check the form and try again.');
+        setGeneralError('Registration could not be completed. Please check your details and try again.');
       }
     }
 
@@ -113,16 +145,48 @@ function Login({ onLogin }) {
 
     const backendUsername = response.data?.user?.username || response.data?.username || normalizedIdentifier;
     const backendProfilePicture = response.data?.user?.profile_picture_url || response.data?.user?.profile_picture || '';
-    onLogin(token, backendUsername, backendProfilePicture);
+    onLogin(token, backendUsername, backendProfilePicture, response.data?.user);
   } catch (loginError) {
     const data = loginError.response?.data;
     setGeneralError(
       data?.detail ||
       data?.non_field_errors?.[0] ||
-      'Login failed, please check credentials.'
+      'We could not sign you in. Check your username or email and password.'
     );
   }
 };
+
+  const handleResendVerification = async () => {
+    if (!pendingVerificationEmail) return;
+    setResendingVerification(true);
+    clearErrors();
+    try {
+      await axios.post(`${apiBase}/auth/registration/resend-email/`, { email: pendingVerificationEmail });
+      setSuccess('A new verification email has been sent. Check your inbox and spam folder.');
+    } catch (error) {
+      setGeneralError(getApiErrorMessage(error.response?.data, 'We could not resend the verification email. Try again shortly.'));
+    } finally {
+      setResendingVerification(false);
+    }
+  };
+
+  const handleSocialLogin = (provider) => {
+    if (authOptionsStatus === 'loading') {
+      setGeneralError('Checking social sign-in configuration. Please try again shortly.');
+      return;
+    }
+    if (authOptionsStatus === 'error') {
+      setGeneralError('Could not check social sign-in configuration. Please try again shortly.');
+      return;
+    }
+
+    const providerConfig = authOptions.providers?.[provider];
+    if (!providerConfig?.configured || !providerConfig.url) {
+      setGeneralError(`${provider === 'google' ? 'Google' : 'Apple'} sign-in is not configured yet. Contact support for help.`);
+      return;
+    }
+    window.location.assign(providerConfig.url);
+  };
 
   const handlePasswordReset = async (event) => {
     event.preventDefault();
@@ -144,7 +208,7 @@ function Login({ onLogin }) {
       setResetEmail('');
     } catch (error) {
       const data = error.response?.data;
-      setGeneralError(data?.detail || 'Failed to send reset email.');
+      setGeneralError(getApiErrorMessage(data, 'We could not send a reset email. Check the address and try again.'));
     }
   };
 
@@ -189,13 +253,29 @@ function Login({ onLogin }) {
       setResetToken('');
     } catch (error) {
       const data = error.response?.data;
-      setGeneralError(data?.detail || 'Failed to reset password.');
+      setGeneralError(getApiErrorMessage(data, 'We could not reset your password. Check the link and try again.'));
     }
   };
 
   // If we have URL params for reset, populate the state
   useEffect(() => {
     const hash = window.location.hash;
+    const verificationMatch = hash.match(/\/verify-email\/([^/?#]+)/);
+    if (verificationMatch) {
+      const key = decodeURIComponent(verificationMatch[1]);
+      setVerificationStatus('checking');
+      axios.post(`${apiBase}/auth/registration/verify-email/`, { key })
+        .then(() => {
+          setVerificationStatus('verified');
+          window.history.replaceState({}, '', `${window.location.pathname}${window.location.search}#/`);
+        })
+        .catch((error) => {
+          setVerificationStatus('failed');
+          setGeneralError(getApiErrorMessage(error.response?.data, 'This verification link is invalid or expired.'));
+        });
+      return;
+    }
+
     if (hash.includes('reset-password/')) {
       const parts = hash.split('reset-password/');
       if (parts[1]) {
@@ -208,12 +288,42 @@ function Login({ onLogin }) {
         }
       }
     }
-  }, []);
+  }, [apiBase]);
 
   return (
     <div className="auth-container">
       <div className="card auth-card">
-        {isResettingPassword ? (
+        {verificationStatus !== 'idle' ? (
+          <section className="auth-status-panel" aria-live="polite">
+            <h2>{verificationStatus === 'checking' ? 'Verifying your email' : verificationStatus === 'verified' ? 'Email verified' : 'Verification link issue'}</h2>
+            {verificationStatus === 'checking' ? (
+              <p>Please wait while we confirm your email address.</p>
+            ) : verificationStatus === 'verified' ? (
+              <>
+                <p>Your email is verified and your account is ready. Sign in to continue.</p>
+                <button type="button" className="auth-action-button" onClick={() => setVerificationStatus('idle')}>Back to sign in</button>
+              </>
+            ) : (
+              <>
+                <p className="auth-error-message">{generalError}</p>
+                <button type="button" className="auth-action-button" onClick={() => { setVerificationStatus('idle'); clearErrors(); }}>Back to sign in</button>
+              </>
+            )}
+          </section>
+        ) : pendingVerificationEmail ? (
+          <section className="auth-status-panel" aria-live="polite">
+            <h2>Check your email</h2>
+            <p>We sent a verification link to <strong>{pendingVerificationEmail}</strong>. Your account is not ready to sign in until you verify this address.</p>
+            {generalError && <p className="auth-error-message">{generalError}</p>}
+            {success && <p className="auth-success-message">{success}</p>}
+            <div className="auth-inline-row">
+              <button type="button" className="auth-action-button" onClick={handleResendVerification} disabled={resendingVerification}>
+                {resendingVerification ? 'Sending…' : 'Resend verification email'}
+              </button>
+              <button type="button" className="auth-action-button" onClick={() => { setPendingVerificationEmail(''); clearErrors(); }}>Back to sign in</button>
+            </div>
+          </section>
+        ) : isResettingPassword ? (
           <>
             <div className="header">
               <div>
@@ -285,8 +395,8 @@ function Login({ onLogin }) {
                 </>
               )}
 
-              {generalError && <p className="small-text" style={{ color: '#dc2626' }}>{generalError}</p>}
-              {success && <p className="small-text" style={{ color: '#16a34a' }}>{success}</p>}
+              {generalError && <p className="auth-error-message" role="alert">{generalError}</p>}
+              {success && <p className="auth-success-message" role="status">{success}</p>}
 
               <button className="auth-submit" type="submit">
                 {resetStep === 'request' ? 'Send Reset Link' : 'Reset Password'}
@@ -323,7 +433,7 @@ function Login({ onLogin }) {
               </div>
             </div>
 
-            <form id="login-form" className="auth-form" onSubmit={handleSubmit}>
+            <form id="login-form" className="auth-form" noValidate onSubmit={handleSubmit}>
               {/* USERNAME / IDENTIFIER FIELD */}
               <div className="form-group">
                 <label htmlFor="identifier">
@@ -455,7 +565,34 @@ function Login({ onLogin }) {
                   </div>
                 </div>
               )}
+              <div className="social-auth-actions">
+                <p>Or continue with</p>
+                <div className="auth-inline-row">
+                  <button type="button" className="auth-action-button" onClick={() => handleSocialLogin('google')}>
+                    <i className="fa-brands fa-google" aria-hidden="true" />
+                    <span>Google</span>
+                  </button>
+                  <button type="button" className="auth-action-button" onClick={() => handleSocialLogin('apple')}>
+                    <i className="fa-brands fa-apple" aria-hidden="true" />
+                    <span>Apple</span>
+                  </button>
+                </div>
+                {(!authOptions.providers?.google?.configured || !authOptions.providers?.apple?.configured) && (
+                  authOptionsStatus === 'ready' && (
+                    <small>Google and Apple authentication require provider credentials to be configured.</small>
+                  )
+                )}
+                {authOptionsStatus === 'error' && (
+                  <small role="status">Social sign-in availability could not be checked.</small>
+                )}
+              </div>
             </div>
+
+            {onNavigate && (
+              <button type="button" className="auth-support-link" onClick={() => onNavigate('support')}>
+                Need help? Help &amp; Support
+              </button>
+            )}
           </>
         )}
       </div>

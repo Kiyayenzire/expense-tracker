@@ -8,8 +8,12 @@ export function InsightsSection({ prediction = {}, insights = {}, symbol }) {
 	const highVolumeCategories = predictionPayload.high_volume_categories || prediction.high_volume_categories || insights.high_volume_categories || [];
 	const predictedAmount = predictionPayload.predicted_amount ?? predictionPayload.prediction ?? prediction.predicted_amount ?? prediction.prediction;
 	const financialInsights = insights.financial_insights || [];
-	const showSpendingPrediction = true;
-	const showBudgetRecommendations = false;
+	const hasPredictionSummary =
+		predictedAmount != null ||
+		(Array.isArray(highVolumeCategories) && highVolumeCategories.length > 0) ||
+		(Boolean(predictionPayload.predicted_amount) || Boolean(predictionPayload.prediction) || Boolean(predictionPayload.predictions));
+	const showSpendingPrediction = hasPredictionSummary;
+	const showBudgetRecommendations = recommendations.length > 0;
 
 	return (
 		<section className="insights-dashboard">
@@ -33,7 +37,7 @@ export function InsightsSection({ prediction = {}, insights = {}, symbol }) {
 			</section>
 			{showSpendingPrediction && <section className="card insight-feature" id="spending-prediction">
 				<h2>Spending Prediction</h2>
-				{predictedAmount != null && <p>Next month forecast: {symbol}{Number(predictedAmount).toFixed(2)}</p>}
+				{predictedAmount != null && <p>Next month forecast: {symbol}{Math.round(Number(predictedAmount))}</p>}
 				{Object.keys(predictions).length > 0 ? <ul>{Object.entries(predictions).map(([category, amount]) => <li key={category}>{category}: {symbol}{Number(amount).toFixed(2)}</li>)}</ul> : <p>No prediction is available yet.</p>}
 				{highVolumeCategories.length > 0 && <><strong>Categories With 11+ Entries</strong><ul>{highVolumeCategories.map((item) => <li key={item.category}>{item.category}: {item.entry_count} entries, forecast {symbol}{Number(item.forecast).toFixed(2)}</li>)}</ul></>}
 			</section>}

@@ -22,7 +22,7 @@ describe('Frontend navigation integration tests', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole('button', { name: /open summary menu/i }));
+    await user.click(screen.getByRole('button', { name: /open summary navigation/i }));
     await user.click(screen.getByRole('button', { name: /monthly/i }));
 
     expect(screen.getByText(/monthly summary/i)).toBeInTheDocument();

@@ -15,6 +15,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      '/accounts': {
+        target: apiProxyTarget.replace(/\/api\/?$/, ''),
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
   preview: {
@@ -23,6 +28,11 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: apiProxyTarget,
+        changeOrigin: true,
+        secure: false,
+      },
+      '/accounts': {
+        target: apiProxyTarget.replace(/\/api\/?$/, ''),
         changeOrigin: true,
         secure: false,
       },

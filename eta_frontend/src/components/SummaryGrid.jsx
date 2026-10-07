@@ -8,6 +8,7 @@ export function SummaryGrid({ onNavigate }) {
     { label: 'Quarterly', page: 'quarterly' },
     { label: 'Annual', page: 'annual' },
     { label: 'Spending Trends', page: 'spending-trends' },
+    { label: 'Help & Support', page: 'support' },
   ];
 
   return (

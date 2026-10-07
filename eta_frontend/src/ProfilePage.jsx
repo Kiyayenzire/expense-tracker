@@ -18,6 +18,13 @@ export default function ProfilePage({ token, onLogout, theme, setTheme, onNaviga
   const [success, setSuccess] = useState('');
   const [selectedImage, setSelectedImage] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
+  const [hasUsablePassword, setHasUsablePassword] = useState(false);
+  const [socialProviders, setSocialProviders] = useState([]);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [settingPassword, setSettingPassword] = useState(false);
+  const [disconnectingProvider, setDisconnectingProvider] = useState('');
+  const [providerPassword, setProviderPassword] = useState('');
 
   const apiBase = useMemo(() => import.meta.env.VITE_API_BASE_URL || '/api', []);
 
@@ -45,6 +52,8 @@ export default function ProfilePage({ token, onLogout, theme, setTheme, onNaviga
           monthly_income: data.monthly_income || '0.00',
           profile_picture_url: data.profile_picture_url || '',
         });
+        setHasUsablePassword(Boolean(data.has_usable_password));
+        setSocialProviders(data.social_providers || []);
         if (data.profile_picture_url) {
           localStorage.setItem('expense-tracker-profile-picture', data.profile_picture_url);
           setPreviewUrl(data.profile_picture_url);
@@ -142,6 +151,69 @@ export default function ProfilePage({ token, onLogout, theme, setTheme, onNaviga
     }
   };
 
+  const handleSetPassword = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await fetch(`${apiBase}/auth/password/set/`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Token ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          new_password: newPassword,
+          confirm_password: confirmNewPassword,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.detail || data.new_password?.[0] || data.confirm_password?.[0] || 'Unable to set password.');
+      }
+      setHasUsablePassword(true);
+      setNewPassword('');
+      setConfirmNewPassword('');
+      setSuccess('Password created. You can now sign in with your email and password or your linked provider.');
+    } catch (passwordError) {
+      setError(passwordError.message || 'Unable to set password.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDisconnectProvider = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await fetch(`${apiBase}/auth/social/disconnect/`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Token ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ provider: disconnectingProvider, password: providerPassword }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.detail || data.password?.[0] || 'Unable to disconnect this provider.');
+      }
+      setSocialProviders(data.social_providers || []);
+      setDisconnectingProvider('');
+      setProviderPassword('');
+      setSuccess(data.detail || 'Provider disconnected.');
+    } catch (disconnectError) {
+      setError(disconnectError.message || 'Unable to disconnect this provider.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const profileImage = previewUrl || profile.profile_picture_url || profilePicture || '';
 
   return (
@@ -216,6 +288,99 @@ export default function ProfilePage({ token, onLogout, theme, setTheme, onNaviga
                 )}
               </div>
             </form>
+          )}
+
+          {!loading && (
+            <section className="profile-security" aria-labelledby="profile-security-heading">
+              <h3 id="profile-security-heading">Sign-in methods</h3>
+              <p className="small-text">
+                {hasUsablePassword ? 'A password is set for this account.' : 'This account does not have a password yet.'}
+              </p>
+
+              {!hasUsablePassword && (
+                <form className="profile-form" onSubmit={handleSetPassword}>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label htmlFor="new-account-password">New password</label>
+                      <input
+                        id="new-account-password"
+                        className="form-control"
+                        type="password"
+                        autoComplete="new-password"
+                        value={newPassword}
+                        onChange={(event) => setNewPassword(event.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="confirm-account-password">Confirm new password</label>
+                      <input
+                        id="confirm-account-password"
+                        className="form-control"
+                        type="password"
+                        autoComplete="new-password"
+                        value={confirmNewPassword}
+                        onChange={(event) => setConfirmNewPassword(event.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <button type="submit" className="primary-action-button" disabled={saving}>
+                    {saving ? 'Setting password…' : 'Create password'}
+                  </button>
+                </form>
+              )}
+
+              <div className="profile-social-methods">
+                <h4>Connected providers</h4>
+                {socialProviders.length === 0 ? (
+                  <p className="small-text">No Google or Apple accounts are connected.</p>
+                ) : socialProviders.map((provider) => (
+                  <div className="profile-social-method" key={provider}>
+                    <span>{provider === 'google' ? 'Google' : provider === 'apple' ? 'Apple' : provider}</span>
+                    {disconnectingProvider === provider ? (
+                      <form onSubmit={handleDisconnectProvider}>
+                        <label htmlFor={`disconnect-password-${provider}`}>Account password</label>
+                        <input
+                          id={`disconnect-password-${provider}`}
+                          className="form-control"
+                          type="password"
+                          autoComplete="current-password"
+                          value={providerPassword}
+                          onChange={(event) => setProviderPassword(event.target.value)}
+                          required
+                        />
+                        <div className="profile-actions">
+                          <button type="submit" className="danger-action-button" disabled={saving}>
+                            {saving ? 'Disconnecting…' : 'Confirm disconnect'}
+                          </button>
+                          <button
+                            type="button"
+                            className="secondary-action-button"
+                            onClick={() => {
+                              setDisconnectingProvider('');
+                              setProviderPassword('');
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <button
+                        type="button"
+                        className="secondary-action-button"
+                        disabled={!hasUsablePassword || saving}
+                        title={!hasUsablePassword ? 'Create a password before disconnecting a provider.' : undefined}
+                        onClick={() => setDisconnectingProvider(provider)}
+                      >
+                        Disconnect
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
           )}
         </section>
       </main>

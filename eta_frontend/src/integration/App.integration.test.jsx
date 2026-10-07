@@ -10,6 +10,7 @@ describe('App integration tests', () => {
     window.localStorage.clear();
     window.location.hash = '';
     vi.clearAllMocks();
+    axios.get.mockResolvedValue({ data: { providers: {}, support: {} } });
   });
 
   it('logs a user in and shows the dashboard main navigation', async () => {
@@ -27,6 +28,7 @@ describe('App integration tests', () => {
     });
 
     expect(await screen.findByRole('button', { name: /dashboard/i })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /open account menu/i }));
     expect(screen.getByRole('button', { name: /log out/i })).toBeInTheDocument();
   });
 
@@ -35,6 +37,7 @@ describe('App integration tests', () => {
 
     render(<App />);
 
+    await userEvent.click(screen.getByRole('button', { name: /open account menu/i }));
     const deleteButton = screen.getByRole('button', { name: /delete account/i });
     await userEvent.click(deleteButton);
 

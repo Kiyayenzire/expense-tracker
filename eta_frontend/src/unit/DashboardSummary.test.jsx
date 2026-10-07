@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { CategorySummary } from '../components/CategorySummary';
 import { SpendingChart } from '../components/SpendingChart';
 import { formatDateEU } from '../api';
@@ -37,6 +38,30 @@ describe('CategorySummary unit tests', () => {
     expect(screen.getByText('Communication')).toBeInTheDocument();
     expect(screen.getByText('Food')).toBeInTheDocument();
     expect(screen.getByText('Transport')).toBeInTheDocument();
+  });
+
+  it('defaults category cards to latest update and supports alphabetical sorting', async () => {
+    const categories = [
+      { category: 'Food', total: 100, color: '#00ff00' },
+      { category: 'Transport', total: 20, color: '#ff0000' },
+      { category: 'Communication', total: 50, color: '#0000ff' },
+    ];
+    const expenses = [
+      { category_name: 'Food', updated_at: '2026-09-01T10:00:00Z' },
+      { category_name: 'Transport', updated_at: '2026-09-03T10:00:00Z' },
+      { category_name: 'Communication', updated_at: '2026-09-02T10:00:00Z' },
+    ];
+
+    render(<CategorySummary categories={categories} year={2026} symbol="€" expenses={expenses} />);
+
+    const getCardOrder = () => [...document.querySelectorAll('.category-total-button span')].map((item) => item.textContent);
+    expect(getCardOrder()).toEqual(['Transport', 'Communication', 'Food']);
+
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: /sort categories/i }), 'asc');
+    expect(getCardOrder()).toEqual(['Communication', 'Food', 'Transport']);
+
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: /sort categories/i }), 'desc');
+    expect(getCardOrder()).toEqual(['Transport', 'Food', 'Communication']);
   });
 
   it('formats DD/MM/YYYY dates without producing an invalid timestamp', () => {

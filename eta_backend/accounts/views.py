@@ -1,22 +1,164 @@
 """
 Custom password reset and account management views for the accounts app.
 """
-from django.contrib.auth import authenticate, get_user_model
+import secrets
+
+from django.contrib.auth import authenticate, get_user_model, update_session_auth_hash
 from django.contrib.auth import login as django_login
+from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
+from django.core.exceptions import ValidationError as DjangoValidationError
+from allauth.account.models import EmailAddress
+from allauth.socialaccount.models import SocialAccount, SocialApp
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.core.mail import send_mail
 from django.conf import settings
+from django.core.cache import cache
+from django.http import HttpResponseRedirect
+from django.utils.http import urlencode
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from allauth.account.models import get_emailconfirmation_model
 
-from .serializers import UserProfileSerializer
+from .serializers import EmailVerificationRegisterSerializer, UserProfileSerializer
+from .tasks import send_registration_verification_email
 
 User = get_user_model()
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def auth_options(request):
+    configured_providers = set(
+        SocialApp.objects.filter(sites__id=settings.SITE_ID, provider__in=['google', 'apple'])
+        .values_list('provider', flat=True)
+        .distinct()
+    )
+    return Response({
+        'providers': {
+            provider: {
+                'configured': provider in configured_providers,
+                'url': request.build_absolute_uri(f'/accounts/{provider}/login/'),
+            }
+            for provider in ('google', 'apple')
+        },
+        'support': {
+            'email': settings.SUPPORT_EMAIL,
+            'phone': settings.SUPPORT_PHONE,
+        },
+    })
+
+
+def social_login_complete(request):
+    if not request.user.is_authenticated:
+        return HttpResponseRedirect(f'{settings.FRONTEND_URL}/#/')
+
+    code = secrets.token_urlsafe(32)
+    cache.set(f'auth:social-login:{code}', request.user.pk, timeout=60)
+    query = urlencode({'code': code})
+    return HttpResponseRedirect(f'{settings.FRONTEND_URL.rstrip("/")}/#/social-login?{query}')
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def social_login_exchange(request):
+    code = str(request.data.get('code') or '').strip()
+    if not code:
+        return Response({'detail': 'A social login code is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    cache_key = f'auth:social-login:{code}'
+    user_id = cache.get(cache_key)
+    if user_id is None:
+        return Response({'detail': 'This social login link is invalid or expired.'}, status=status.HTTP_400_BAD_REQUEST)
+    cache.delete(cache_key)
+
+    user = User.objects.filter(pk=user_id, is_active=True).first()
+    if user is None:
+        return Response({'detail': 'This account is not active.'}, status=status.HTTP_403_FORBIDDEN)
+
+    token, _ = Token.objects.get_or_create(user=user)
+    return Response({
+        'key': token.key,
+        'user': UserProfileSerializer(user, context={'request': request}).data,
+    })
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def register_user(request):
+    email = request.data.get('email')
+    normalized_email = email.strip().lower() if isinstance(email, str) else ''
+    if normalized_email and (
+        User.objects.filter(email__iexact=normalized_email).exists()
+        or EmailAddress.objects.filter(email__iexact=normalized_email).exists()
+    ):
+        return Response(
+            {'email': ['A user is already registered with this email address.']},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    serializer = EmailVerificationRegisterSerializer(data=request.data, context={'request': request})
+    serializer.is_valid(raise_exception=True)
+    user = serializer.save(request)
+    email_address = EmailAddress.objects.get(user=user, email__iexact=user.email)
+
+    try:
+        send_registration_verification_email.delay(email_address.pk)
+    except Exception:
+        return Response({
+            'detail': 'Your account is pending verification, but we could not queue the email. Please use resend verification email to try again.',
+            'email': user.email,
+            'verification_pending': True,
+        }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    return Response({
+        'detail': 'Registration received. Check your email to verify your account before signing in.',
+        'email': user.email,
+        'verification_pending': True,
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def resend_registration_verification(request):
+    email = str(request.data.get('email') or '').strip()
+    if not email:
+        return Response({'email': ['Enter the email address used to register.']}, status=status.HTTP_400_BAD_REQUEST)
+
+    address = EmailAddress.objects.select_related('user').filter(email__iexact=email).first()
+    if address and not address.verified and not address.user.is_active:
+        try:
+            send_registration_verification_email.delay(address.pk)
+        except Exception:
+            return Response({
+                'detail': 'We could not queue the verification email. Please try again shortly.'
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    return Response({
+        'detail': 'If this email belongs to an unverified account, a verification email has been sent.'
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def verify_registration_email(request):
+    key = str(request.data.get('key') or '').strip()
+    if not key:
+        return Response({'detail': 'A verification key is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    confirmation = get_emailconfirmation_model().from_key(key)
+    if confirmation is None:
+        return Response({'detail': 'This verification link is invalid, expired, or already used.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    email_address = confirmation.confirm(request)
+    if email_address is None:
+        return Response({'detail': 'This email address could not be verified.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response({'detail': 'Email verified. Your account is ready to sign in.'}, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
@@ -35,10 +177,24 @@ def custom_login(request):
             'detail': 'Username/email not found. Please check it and try again or create a new account.'
         }, status=status.HTTP_400_BAD_REQUEST)
 
+    if not user.check_password(password):
+        return Response({
+            'detail': 'Incorrect password. Please try again or use the forgot password link.'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    email_address = EmailAddress.objects.filter(user=user, email__iexact=user.email).first()
+    if email_address and not email_address.verified:
+        return Response({
+            'detail': 'Please verify your email address before signing in. Check your inbox or resend the verification email.'
+        }, status=status.HTTP_403_FORBIDDEN)
+
+    if not user.is_active:
+        return Response({'detail': 'This account is inactive. Contact support if you need help.'}, status=status.HTTP_403_FORBIDDEN)
+
     auth_user = authenticate(request, username=user.username, password=password)
     if not auth_user:
         return Response({
-            'detail': 'Password is incorrect for this account. Please try again or use the reset password link.'
+            'detail': 'Incorrect password. Please try again or use the forgot password link.'
         }, status=status.HTTP_400_BAD_REQUEST)
 
     django_login(request, auth_user)
@@ -207,3 +363,90 @@ def custom_password_reset_confirm(request):
         {'detail': 'Password has been reset successfully.'},
         status=status.HTTP_200_OK
     )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def set_password(request):
+    user = request.user
+    if user.has_usable_password():
+        return Response(
+            {'detail': 'A password is already set. Use Forgot Password to change it.'},
+            status=status.HTTP_409_CONFLICT,
+        )
+    if not EmailAddress.objects.filter(user=user, verified=True).exists():
+        return Response(
+            {'detail': 'Verify your email address before creating a password.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    new_password = str(request.data.get('new_password') or '')
+    confirm_password = str(request.data.get('confirm_password') or '')
+    if not new_password or not confirm_password:
+        return Response(
+            {'detail': 'New password and confirmation are required.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if new_password != confirm_password:
+        return Response(
+            {'confirm_password': ['Passwords do not match.']},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        validate_password(new_password, user=user)
+    except DjangoValidationError as exc:
+        return Response(
+            {'new_password': exc.messages},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    user.set_password(new_password)
+    user.save(update_fields=['password'])
+    if request.session.get('_auth_user_id') == str(user.pk):
+        update_session_auth_hash(request, user)
+
+    return Response({'detail': 'Password set successfully.'}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def disconnect_social_account(request):
+    provider = str(request.data.get('provider') or '').strip().lower()
+    if provider not in {'google', 'apple'}:
+        return Response(
+            {'provider': ['Choose a linked Google or Apple account.']},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    user = request.user
+    password = str(request.data.get('password') or '')
+    if not user.has_usable_password() or not password or not user.check_password(password):
+        return Response(
+            {'password': ['Enter your account password before disconnecting a provider.']},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    social_account = SocialAccount.objects.filter(user=user, provider=provider).first()
+    if social_account is None:
+        return Response(
+            {'detail': 'That provider is not linked to this account.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    has_other_provider = SocialAccount.objects.filter(user=user).exclude(pk=social_account.pk).exists()
+    has_verified_email = EmailAddress.objects.filter(user=user, verified=True).exists()
+    if not has_other_provider and not has_verified_email:
+        return Response(
+            {'detail': 'Verify an email address or connect another sign-in method before disconnecting the last provider.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    social_account.delete()
+    providers = sorted(
+        set(SocialAccount.objects.filter(user=user).values_list('provider', flat=True))
+    )
+    return Response({
+        'detail': f'{provider.title()} has been disconnected.',
+        'social_providers': providers,
+    }, status=status.HTTP_200_OK)

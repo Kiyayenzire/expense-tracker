@@ -27,7 +27,7 @@ services:
       - redis_data:/data
 
   migration:
-    image: ghcr.io/kiyayenzire/eta_backend:latest
+    image: ghcr.io/kiyayenzire/eta_backend:${IMAGE_TAG:-latest}
     container_name: eta_migration
     command: sh -c "python manage.py migrate --noinput && python manage.py collectstatic --noinput && python manage.py seed_initial_data"
     env_file:
@@ -41,7 +41,7 @@ services:
         condition: service_healthy
 
   backend:
-    image: ghcr.io/kiyayenzire/eta_backend:latest
+    image: ghcr.io/kiyayenzire/eta_backend:${IMAGE_TAG:-latest}
     container_name: eta_backend
     restart: always
     ports:
@@ -60,7 +60,7 @@ services:
         condition: service_completed_successfully
 
   celery_worker:
-    image: ghcr.io/kiyayenzire/eta_backend:latest
+    image: ghcr.io/kiyayenzire/eta_backend:${IMAGE_TAG:-latest}
     container_name: eta_celery_worker
     restart: always
     command: celery -A backend worker --loglevel=info
@@ -77,7 +77,7 @@ services:
         condition: service_completed_successfully
 
   celery_beat:
-    image: ghcr.io/kiyayenzire/eta_backend:latest
+    image: ghcr.io/kiyayenzire/eta_backend:${IMAGE_TAG:-latest}
     container_name: eta_celery_beat
     restart: always
     command: celery -A backend beat --loglevel=info -S django_celery_beat.schedulers:DatabaseScheduler --pidfile=/tmp/celerybeat.pid
@@ -92,12 +92,13 @@ services:
         condition: service_completed_successfully
 
   frontend:
-    image: ghcr.io/kiyayenzire/eta_frontend:latest
+    image: ghcr.io/kiyayenzire/eta_frontend:${IMAGE_TAG:-latest}
     build:
       context: ./eta_frontend
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: /api
+        VITE_SUPPORT_EMAIL: ${VITE_SUPPORT_EMAIL:-irislee.8154@gmail.com}
     container_name: eta_frontend
     restart: always
     ports:

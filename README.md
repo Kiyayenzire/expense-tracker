@@ -56,7 +56,7 @@ docker compose --env-file .env.dev up -d --build
    - Frontend: http://localhost:5174
    - Backend API: http://localhost:8002/api
 
-4. Create an admin or superuser if required:
+4. Create a Django superuser if required:
 
 ```bash
 docker compose --env-file .env.dev exec backend python manage.py createsuperuser
@@ -67,6 +67,9 @@ docker compose --env-file .env.dev exec backend python manage.py createsuperuser
 ```text
 http://127.0.0.1:8002/etaalthech2026/
 ```
+
+Django Admin is restricted to superusers. Each Admin session must be established through the Admin login form with a username and password; an app password session or Google/Apple sign-in session alone does not grant Admin access.
+Admin sessions expire after 11 minutes without mouse, keyboard, touch, scroll, or Admin request activity. This timeout applies only to Django Admin; regular application sessions are unchanged.
 
 ## Environment configuration
 
@@ -80,8 +83,45 @@ The default development values are stored in `.env.dev` and include:
 - default currency as EUR
 - custom admin URL `etaalthech2026`
 - frontend base URL
+- mandatory email verification for password registration
+- optional support contact settings (`SUPPORT_EMAIL`, `SUPPORT_PHONE`)
 
 Do not commit real secrets to version control. For production, use a secure `.env` or `.env.prod` file and keep API keys out of source control.
+
+## Account verification and social sign-in
+
+Password registrations remain inactive until the user opens the verification link sent to their email. In development, `.env.dev` uses Django's console email backend, so the message is printed in the backend container logs. Production uses the configured `EMAIL_BACKEND` and SMTP settings from the production environment.
+
+Google and Apple sign-in are optional and must be configured separately in each environment's database. Password-based registration and sign-in do not depend on these providers.
+
+When the login screen loads, it requests `GET /api/auth/options/`. A provider is reported as configured when a Django Social Application for that provider is associated with the Site whose ID is `SITE_ID` (default `1`). This check confirms the database record and Site association only; it does not test the credentials or the provider's OAuth callback. If the request itself fails, the login screen reports that availability could not be checked instead of claiming the provider is unconfigured.
+
+To enable a provider in local development, staging, or production:
+
+1. Create OAuth credentials in the provider's developer console and register the callback URL for that environment. Use the matching URLs below:
+
+```text
+http://localhost:8002/accounts/google/login/callback/
+http://localhost:8002/accounts/apple/login/callback/
+https://eta.althech.com/accounts/google/login/callback/
+https://eta.althech.com/accounts/apple/login/callback/
+```
+
+2. Open that environment's Django Admin and go to **Social Accounts > Social Applications**. Add a Google or Apple application with the credentials from the provider. Do not commit OAuth secrets to the repository.
+3. In the application's **Sites** field, select the Site record with ID matching `SITE_ID` for that environment, then save. Each environment has its own database and must be configured independently. The Site domain should match the environment's public host.
+4. Check `GET /api/auth/options/` for that environment. The selected provider should have `"configured": true`. Then complete a real sign-in to verify the credentials and callback with the provider.
+
+For local development, the admin URL is `http://localhost:8002/etaalthech2026/`. A `true` readiness value alone does not prove the provider credentials or callback are valid; if OAuth redirects fail after that check, verify the provider console credentials and exact callback URL.
+
+### Social accounts, passwords, and linking
+
+A social sign-up creates a normal application user and a separate allauth `SocialAccount` link. The social account is identified by its provider and provider user ID; adding a local password does not remove that link. In the Profile page, a social-only user can create a password after their email is verified. The existing **Forgot Password** flow can also set a password while signed out. Both methods update the same user account.
+
+Verified-email auto-linking is enabled for Google and Apple. The provider must supply an email allauth marks verified, and the local address must also be verified and resolve to exactly one active user. Unverified, duplicate, or ambiguous matches are rejected; the adapter does not select an arbitrary user or erase an existing password. Emails are trimmed and lowercased when saved.
+
+The Profile page lists linked providers. Disconnecting one requires the account password; social-only users must create a password first. A verified email or another linked provider must remain available before disconnecting the final provider. These checks are enforced by the application endpoint and allauth's own disconnect flow.
+
+Set `SUPPORT_EMAIL` and `SUPPORT_PHONE` in the runtime environment to show real help contacts on the login and registration screen. Leave them unset until the correct public contact details are available.
 
 ## Core features
 
@@ -137,13 +177,17 @@ npm run test:e2e
 
 ## Production setup
 
-Use the root `docker-compose.yml` stack with a production-ready environment file:
+Production keeps the server's existing Compose and host Nginx configuration. The Compose ports are backend `127.0.0.1:8002` and frontend `127.0.0.1:3002`; the host Nginx routes Admin/API/account paths to the backend and website paths to the frontend. Do not replace the server Compose or Nginx files during image deployment.
 
 ```bash
-docker compose --env-file .env up -d --build
+docker compose -f docker-compose.yml --env-file .env ps
 ```
 
-If using Nginx in front of the app, the project includes configuration under `nginx/` and the stack wires web traffic through the reverse proxy.
+Production keeps the existing host reverse proxy and Compose port mappings: Django is published at `127.0.0.1:8002`, and the frontend at `127.0.0.1:3002`. The host reverse proxy must send `/api/`, `/accounts/`, and the configured Django Admin path to port `8002`; normal website routes go to port `3002`. The deployment workflow does not replace the server's Compose or Nginx files.
+
+On a successful push to `main`, CI tests the backend and frontend, runs browser tests, builds and publishes images, then deploys those exact commit-tagged images through a temporary Compose override. The server's existing Compose file, ports, Nginx configuration, and persistent volumes are left unchanged. The workflow only reports green after the live website, auth-options endpoint, and Django Admin login page pass smoke checks.
+
+The support contact is `irislee.8154@gmail.com`. Set `VITE_SUPPORT_EMAIL` in `eta_frontend/.env` for local frontend builds. Production frontend images read the same value from the GitHub Actions repository variable `VITE_SUPPORT_EMAIL`; if unset, the frontend config fallback uses this address.
 
 ## Local development notes
 

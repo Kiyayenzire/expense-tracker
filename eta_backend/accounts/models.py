@@ -42,6 +42,16 @@ class User(AbstractUser):
 
     objects = UserManager()
 
+    def save(self, *args, **kwargs):
+        if self.email:
+            normalized_email = self.email.strip().lower()
+            if normalized_email != self.email:
+                self.email = normalized_email
+                update_fields = kwargs.get('update_fields')
+                if update_fields is not None:
+                    kwargs['update_fields'] = set(update_fields) | {'email'}
+        return super().save(*args, **kwargs)
+
     @property
     def is_account_deletion_pending(self):
         return self.account_deletion_requested_at is not None

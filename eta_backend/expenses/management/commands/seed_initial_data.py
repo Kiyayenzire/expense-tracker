@@ -8,8 +8,8 @@ CATALOG = {
     'Housing': ['Rent', 'Mortgage', 'Construction', 'Other'],
     'Food': ['Proteins', 'Fruits', 'Vegetables', 'Carbohydrates', 'Oils & Spices', 'Other'],
     'Utilities': ['Electricity', 'Gas', 'Water', 'Trash Collection', 'Other'],
-    'Transport': ['Taxi', 'Train', 'Bus', 'Plane', 'Other'],
-    'Health Care': ['Drugs', 'Consultation', 'Medical care', 'Other'],
+    'Transport': ['Taxi', 'Train', 'Bus', 'Plane', 'Boda Boda', 'Car Insurance', 'Repairs', 'Tires', 'Other'],
+    'Health Care': ['Drugs', 'Consultation', 'Medical care', 'Health Insurance', 'Tests', 'Supplements', 'Other'],
     'Communication': ['Internet', 'Mobile Phone', 'Landline', 'Other'],
     'Debt Payment': ['Debt Payment', 'Other'],
     'Personal Care': ['Clothing', 'Toiletries', 'Grooming Items', 'Saloon', 'Other'],
@@ -35,8 +35,9 @@ MEASUREMENTS = {
     'Rent': 'un', 'Mortgage': 'un', 'Construction': 'un',
     'Proteins': 'kg', 'Fruits': 'kg', 'Vegetables': 'kg', 'Carbohydrates': 'kg', 'Oils & Spices': 'bt',
     'Electricity': 'un', 'Gas': 'bt', 'Water': 'ltr', 'Trash Collection': 'un',
-    'Taxi': 'un', 'Train': 'un', 'Bus': 'un', 'Plane': 'un',
-    'Drugs': 'pc', 'Consultation': 'un', 'Medical care': 'un',
+    'Taxi': 'un', 'Train': 'un', 'Bus': 'un', 'Plane': 'un', 'Boda Boda': 'un',
+    'Car Insurance': 'un', 'Repairs': 'un', 'Tires': 'pc',
+    'Drugs': 'pc', 'Consultation': 'un', 'Medical care': 'un', 'Health Insurance': 'un', 'Tests': 'un', 'Supplements': 'pc',
     'Internet': 'un', 'Mobile Phone': 'un', 'Landline': 'un',
     'Debt Payment': 'un', 'Clothing': 'pc', 'Toiletries': 'pc', 'Grooming Items': 'pc', 'Saloon': 'un',
     'Cinema': 'un', 'Paid TV': 'un', 'Vacation': 'un', 'Celebrations': 'un',
@@ -54,6 +55,14 @@ class Command(BaseCommand):
     help = 'Seed initial categories, subcategories, items, currencies, and exchange rates.'
 
     def handle(self, *args, **options):
+        transport = Category.objects.filter(name='Transport').first()
+        if transport:
+            boda_boda = SubCategory.objects.filter(category=transport, name='Boda Boda Transport').first()
+            if boda_boda:
+                boda_boda.name = 'Boda Boda'
+                boda_boda.save(update_fields=['name'])
+                Item.objects.filter(category=transport, subcategory=boda_boda, description='Boda Boda Transport').update(description='Boda Boda')
+
         created_categories = {}
         for index, name in enumerate(CATALOG):
             category, _ = Category.objects.update_or_create(

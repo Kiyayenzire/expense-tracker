@@ -20,7 +20,7 @@ test('app shows the main expense tracker header on the dashboard state', async (
 
   await expect(page.getByRole('heading', { name: /expense tracker/i })).toBeVisible();
   await expect(page.getByRole('button', { name: /dashboard/i })).toBeVisible();
-  await page.getByRole('button', { name: /anders|reprouser|playwright|user/i }).click();
+  await page.getByRole('button', { name: /open account menu/i }).click();
   await expect(page.getByRole('button', { name: /log out/i })).toBeVisible();
 });
 

@@ -19,3 +19,14 @@
 {{ block.super }}
 <link rel="stylesheet" href="{% static 'eta_admin.css' %}">
 {% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+{% if request.user.is_authenticated and request.user.is_superuser %}
+<script src="{% static 'eta_admin_idle.js' %}"
+	defer
+	data-idle-timeout-seconds="660"
+	data-activity-url="{% url 'admin-session-activity' %}"
+	data-login-url="{% url 'admin:login' %}"></script>
+{% endif %}
+{% endblock %}

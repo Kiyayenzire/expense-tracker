@@ -4,7 +4,7 @@ import { MEASUREMENT_CHOICES } from '../constants/measurements';
 
 const PAGE_SIZE = 11;
 
-export function ExpenseTable({ expenses, displayCurrency, categories = [], currencies = [], client, onRefresh }) {
+export function ExpenseTable({ expenses, displayCurrency, categories = [], subcategories = [], currencies = [], client, onRefresh }) {
   const [editingId, setEditingId] = useState(null);
   const [draft, setDraft] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
@@ -20,6 +20,7 @@ export function ExpenseTable({ expenses, displayCurrency, categories = [], curre
     setDraft({
       date: exp.date || '',
       category: exp.category ?? '',
+      subcategory: exp.subcategory ?? '',
       item_description: exp.item_description || '',
       measurement: exp.measurement || 'pc',
       quantity: String(exp.quantity ?? '1'),
@@ -37,6 +38,7 @@ export function ExpenseTable({ expenses, displayCurrency, categories = [], curre
     const payload = {
       date: draft.date,
       category: Number(draft.category),
+      subcategory: draft.subcategory ? Number(draft.subcategory) : null,
       item_description: draft.item_description,
       measurement: draft.measurement,
       quantity: Number(draft.quantity),
@@ -143,9 +145,18 @@ export function ExpenseTable({ expenses, displayCurrency, categories = [], curre
                   </div>
                   <div className="col-md-6">
                     <label className="form-label">Category</label>
-                    <select className="form-control" value={draft.category ?? ''} onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value }))}>
+                    <select className="form-control" value={draft.category ?? ''} onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value, subcategory: '' }))}>
                       {categories.map((category) => (
                         <option key={category.id} value={category.id}>{category.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label" htmlFor="edit-expense-subcategory">Subcategory</label>
+                    <select id="edit-expense-subcategory" className="form-control" value={draft.subcategory ?? ''} onChange={(event) => setDraft((current) => ({ ...current, subcategory: event.target.value }))}>
+                      <option value="">No subcategory</option>
+                      {subcategories.filter((subcategory) => String(subcategory.category) === String(draft.category)).map((subcategory) => (
+                        <option key={subcategory.id} value={subcategory.id}>{subcategory.name}</option>
                       ))}
                     </select>
                   </div>
@@ -171,7 +182,7 @@ export function ExpenseTable({ expenses, displayCurrency, categories = [], curre
                   </div>
                   <div className="col-md-6">
                     <label className="form-label">Currency</label>
-                    <select className="form-control" value={draft.currency ?? ''} onChange={(event) => setDraft((current) => ({ ...current, currency: event.target.value }))}>
+                    <select className="form-control currency-select" value={draft.currency ?? ''} onChange={(event) => setDraft((current) => ({ ...current, currency: event.target.value }))}>
                       {currencies.map((currency) => (
                         <option key={currency.id} value={currency.id}>{currency.symbol} {currency.code}</option>
                       ))}

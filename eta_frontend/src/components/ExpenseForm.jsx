@@ -139,7 +139,7 @@ export function ExpenseForm({ categories, subcategories, items, currencies, clie
 
           <div className="form-group expense-field expense-field-currency">
             <label htmlFor="expense-currency">Currency</label>
-            <select id="expense-currency" className="form-control" value={form.currency} onChange={(e) => handleChange('currency', e.target.value)}>
+            <select id="expense-currency" className="form-control currency-select" value={form.currency} onChange={(e) => handleChange('currency', e.target.value)}>
               {currencies.map((c) => <option key={c.id} value={c.id}>{c.symbol} {c.code}</option>)}
             </select>
           </div>

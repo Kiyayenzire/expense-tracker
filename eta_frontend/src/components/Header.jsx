@@ -201,6 +201,13 @@ export function Header({
         >
           Insights
         </button>
+        <button
+          type="button"
+          className={activePage === 'support' ? 'nav-button active' : 'nav-button'}
+          onClick={() => onNavigate('support')}
+        >
+          Help &amp; Support
+        </button>
       </nav>
     </header>
   );

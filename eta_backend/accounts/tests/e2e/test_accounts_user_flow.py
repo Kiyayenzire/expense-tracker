@@ -1,5 +1,11 @@
 from datetime import date
+import re
+from unittest.mock import patch
+from urllib.parse import unquote
 
+from allauth.account.models import EmailAddress
+from django.core import mail
+from django.test import override_settings
 import pytest
 from rest_framework import status
 
@@ -7,18 +13,32 @@ from rest_framework import status
 @pytest.mark.e2e
 @pytest.mark.django_db
 class TestAccountsUserFlow:
+    @override_settings(
+        ACCOUNT_EMAIL_VERIFICATION='mandatory',
+        EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+        FRONTEND_URL='http://localhost:5174',
+    )
     def test_account_registration_and_profile_flow(self, api_client):
-        response = api_client.post(
-            '/api/auth/registration/',
-            {
-                'username': 'newuser',
-                'email': 'newuser@example.com',
-                'password1': 'StrongPassword1!',
-                'password2': 'StrongPassword1!',
-            },
-            format='json',
-        )
-        assert response.status_code in [status.HTTP_201_CREATED, status.HTTP_200_OK]
+        with patch('accounts.views.send_registration_verification_email.delay'):
+            response = api_client.post(
+                '/api/auth/registration/',
+                {
+                    'username': 'newuser',
+                    'email': 'newuser@example.com',
+                    'password1': 'StrongPassword1!',
+                    'password2': 'StrongPassword1!',
+                },
+                format='json',
+            )
+        assert response.status_code == status.HTTP_201_CREATED
+        new_user = __import__('django.contrib.auth', fromlist=['get_user_model']).get_user_model().objects.get(username='newuser')
+        email_address = EmailAddress.objects.get(user=new_user)
+        from accounts.tasks import send_registration_verification_email
+        assert send_registration_verification_email.run(email_address.pk) is True
+        verification_key = unquote(re.search(r'#/verify-email/([^\s]+)', mail.outbox[-1].body).group(1))
+        with patch('allauth.account.adapter.DefaultAccountAdapter.add_message'):
+            verify_response = api_client.post('/api/auth/registration/verify-email/', {'key': verification_key}, format='json')
+        assert verify_response.status_code == status.HTTP_200_OK
 
         login_response = api_client.post(
             '/api/auth/login/',
@@ -55,7 +75,7 @@ class TestAccountsUserFlow:
             format='json',
         )
         assert wrong_password_response.status_code == status.HTTP_400_BAD_REQUEST
-        assert 'password is incorrect' in wrong_password_response.json()['detail'].lower()
+        assert 'incorrect password' in wrong_password_response.json()['detail'].lower()
 
     def test_password_reset_flow_informs_existing_email(self, api_client, test_user):
         response = api_client.post('/api/auth/password/reset/', {'email': 'test@example.com'})

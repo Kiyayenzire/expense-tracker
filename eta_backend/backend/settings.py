@@ -52,6 +52,8 @@ INSTALLED_APPS = [
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
+    'allauth.socialaccount.providers.apple',
     'corsheaders',
     'django_celery_results',
     'django_celery_beat',
@@ -196,10 +198,22 @@ AUTH_USER_MODEL = 'accounts.User'
 
 ACCOUNT_LOGIN_METHODS = {'email', 'username'}
 ACCOUNT_SIGNUP_FIELDS = ['username*', 'email*']
-ACCOUNT_EMAIL_VERIFICATION = env('ACCOUNT_EMAIL_VERIFICATION', default='optional')
+ACCOUNT_EMAIL_VERIFICATION = env('ACCOUNT_EMAIL_VERIFICATION', default='mandatory')
+ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 1
 ACCOUNT_EMAIL_SUBJECT_PREFIX = '[Expense Tracker] '
 ACCOUNT_ADAPTER = 'accounts.adapters.CustomAccountAdapter'
+SOCIALACCOUNT_ADAPTER = 'accounts.adapters.CustomSocialAccountAdapter'
 FRONTEND_URL = env('FRONTEND_URL', default='https://eta.althech.com')
+LOGIN_REDIRECT_URL = '/api/auth/social/complete/'
+SOCIALACCOUNT_LOGIN_ON_GET = True
+SOCIALACCOUNT_EMAIL_VERIFICATION = 'mandatory'
+SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
+SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
+REST_AUTH = {
+    'REGISTER_SERIALIZER': 'accounts.serializers.EmailVerificationRegisterSerializer',
+}
+SUPPORT_EMAIL = env('SUPPORT_EMAIL', default='')
+SUPPORT_PHONE = env('SUPPORT_PHONE', default='')
 
 # Dynamic CORS & CSRF Trusted Origins
 CORS_ALLOW_CREDENTIALS = True

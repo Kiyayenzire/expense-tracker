@@ -121,6 +121,7 @@ export default function ExpensesPage({ token, onLogout, onNavigate, displayCurre
             expenses={filteredExpenses}
             displayCurrency={displayCurrency}
             categories={dashboard.categories}
+            subcategories={dashboard.subcategories}
             currencies={dashboard.currencies}
             client={client}
             onRefresh={dashboard.refetch}

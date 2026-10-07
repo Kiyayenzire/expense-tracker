@@ -10,6 +10,7 @@ import InsightsPage from './InsightsPage';
 import PeriodSummaryPage from './PeriodSummaryPage';
 import ProfilePage from './ProfilePage';
 import SpendingTrendsPage from './SpendingTrendsPage';
+import HelpSupport from './pages/HelpSupport';
 import { AppShell } from './components/AppShell';
 
 // ---------------------------------------------------------------------------
@@ -28,6 +29,7 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem(STORAGE_KEY));
   const [username, setUsername] = useState(localStorage.getItem(USERNAME_KEY) || 'User');
   const [profilePicture, setProfilePicture] = useState(localStorage.getItem(PROFILE_PICTURE_KEY) || '');
+  const [currentUser, setCurrentUser] = useState(null);
   const [theme, setTheme] = useState(() => localStorage.getItem(THEME_KEY) || 'light');
   const [displayCurrency, setDisplayCurrency] = useState('EUR');
   const [page, setPage] = useState(getPageFromHash);
@@ -46,6 +48,30 @@ function App() {
       window.removeEventListener('hashchange', syncPage);
       window.removeEventListener('popstate', syncPage);
     };
+  }, []);
+
+  useEffect(() => {
+    if (!window.location.hash.startsWith('#/social-login?')) return;
+    const params = new URLSearchParams(window.location.hash.slice(window.location.hash.indexOf('?') + 1));
+    const code = params.get('code');
+    if (!code) return;
+
+    fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/auth/social/exchange/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    })
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.detail || 'Unable to finish social sign-in.');
+        handleLogin(data.key, data.user?.username, data.user?.profile_picture_url, data.user);
+        window.history.replaceState({}, '', `${window.location.pathname}${window.location.search}#/`);
+        setPage('dashboard');
+      })
+      .catch(() => {
+        window.history.replaceState({}, '', `${window.location.pathname}${window.location.search}#/`);
+        setPage('dashboard');
+      });
   }, []);
 
   // Effect: Apply theme attribute to html/body elements & update local storage
@@ -70,6 +96,7 @@ function App() {
         return response.json();
       })
       .then((data) => {
+        setCurrentUser({ id: data.id, email: data.email });
         const nextUsername = data.username || localStorage.getItem(USERNAME_KEY) || username || 'User';
         const nextPicture = data.profile_picture_url || data.profile_picture || localStorage.getItem(PROFILE_PICTURE_KEY) || '';
         const safeUsername = String(nextUsername || 'User').trim();
@@ -92,7 +119,7 @@ function App() {
   // 3. ACTION HANDLERS & NAVIGATION
   // ---------------------------------------------------------------------------
 
-  function handleLogin(jwtToken, loggedInUsername = '', profileImage = '') {
+  function handleLogin(jwtToken, loggedInUsername = '', profileImage = '', loggedInUser = null) {
     const sourceUsername = loggedInUsername || localStorage.getItem(USERNAME_KEY) || username || 'User';
     const safeUsername = String(sourceUsername).trim() || 'User';
     const safeProfilePicture = profileImage || localStorage.getItem(PROFILE_PICTURE_KEY) || '';
@@ -107,6 +134,9 @@ function App() {
     setToken(jwtToken);
     setUsername(safeUsername);
     setProfilePicture(safeProfilePicture);
+    if (loggedInUser) {
+      setCurrentUser({ id: loggedInUser.id, email: loggedInUser.email });
+    }
   }
 
   function handleLogout() {
@@ -117,6 +147,7 @@ function App() {
     setToken(null);
     setUsername('User');
     setProfilePicture('');
+    setCurrentUser(null);
     setDeleteFlow({ isOpen: false, password: '', error: '' });
   }
 
@@ -164,6 +195,26 @@ function App() {
     const hash = nextPage === 'dashboard' ? '#/' : `#/${nextPage}`;
     window.history.pushState({}, '', `${window.location.pathname}${window.location.search}${hash}`);
     setPage(nextPage);
+  }
+
+  if (page === 'support') {
+    return token ? (
+      <AppShell
+        token={token}
+        onLogout={handleLogout}
+        theme={theme}
+        setTheme={setTheme}
+        onNavigate={navigate}
+        username={username}
+        profilePicture={profilePicture}
+        displayCurrency={displayCurrency}
+        setDisplayCurrency={setDisplayCurrency}
+      >
+        <HelpSupport currentUser={currentUser} onNavigate={navigate} />
+      </AppShell>
+    ) : (
+      <HelpSupport onNavigate={navigate} />
+    );
   }
 
   // Active page router selection
@@ -217,6 +268,8 @@ function App() {
         <ExpensesPage token={token} onLogout={handleLogout} onNavigate={navigate} displayCurrency={displayCurrency} />
       ) : page === 'reports' ? (
         <ReportsPage token={token} onLogout={handleLogout} displayCurrency={displayCurrency} />
+      ) : page === 'support' ? (
+        <HelpSupport currentUser={currentUser} onNavigate={navigate} />
       ) : page === 'spending-trends' ? (
         <SpendingTrendsPage token={token} onLogout={handleLogout} displayCurrency={displayCurrency} />
       ) : page === 'insights' ? (
@@ -224,7 +277,7 @@ function App() {
       ) : ['daily', 'weekly', 'monthly', 'quarterly', 'annual'].includes(page) ? (
         <PeriodSummaryPage period={page} token={token} onLogout={handleLogout} displayCurrency={displayCurrency} />
       ) : (
-        <Dashboard token={token} onLogout={handleLogout} theme={theme} setTheme={setTheme} onNavigate={navigate} onDeleteAccount={openDeleteAccountFlow} username={username} profilePicture={profilePicture} />
+        <Dashboard token={token} onLogout={handleLogout} theme={theme} setTheme={setTheme} onNavigate={navigate} onDeleteAccount={openDeleteAccountFlow} username={username} profilePicture={profilePicture} displayCurrency={displayCurrency} setDisplayCurrency={setDisplayCurrency} />
       )}
     </>
   );
@@ -251,7 +304,7 @@ function App() {
       </AppShell>
     )
   ) : (
-    <Login onLogin={handleLogin} />
+    <Login onLogin={handleLogin} onNavigate={navigate} />
   );
 }
 

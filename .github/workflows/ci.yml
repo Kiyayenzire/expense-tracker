@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: eta-expense-tracker-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -43,6 +47,18 @@ jobs:
         working-directory: eta_frontend
         run: npm ci
 
+      - name: Run frontend tests
+        working-directory: eta_frontend
+        run: npm test -- --run
+
+      - name: Install Playwright browser
+        working-directory: eta_frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser end-to-end tests
+        working-directory: eta_frontend
+        run: npm run test:e2e -- --workers=1
+
       - name: Build frontend
         working-directory: eta_frontend
         run: npm run build
@@ -62,7 +78,7 @@ jobs:
 
       - name: Set lowercase repository owner
         run: |
-          echo "REPO_OWNER=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
+          printf 'REPO_OWNER=%s\n' "${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -87,6 +103,69 @@ jobs:
           context: ./eta_frontend
           file: ./eta_frontend/Dockerfile
           push: true
+          build-args: |
+            VITE_SUPPORT_EMAIL=${{ vars.VITE_SUPPORT_EMAIL }}
           tags: |
             ghcr.io/${{ env.REPO_OWNER }}/eta_frontend:latest
             ghcr.io/${{ env.REPO_OWNER }}/eta_frontend:${{ github.sha }}
+
+  deploy:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Deploy published images using the server Compose configuration
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          REGISTRY_USERNAME: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_OWNER: ${{ github.repository_owner }}
+          IMAGE_TAG: ${{ github.sha }}
+        with:
+          host: ${{ secrets.DROPLET_IP }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          envs: REGISTRY_USERNAME,REGISTRY_TOKEN,IMAGE_OWNER,IMAGE_TAG
+          script: |
+            set -eu
+            cd /home/deploy/expense-tracker
+            printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$REGISTRY_USERNAME" --password-stdin
+            image_owner="$(printf '%s' "$IMAGE_OWNER" | tr '[:upper:]' '[:lower:]')"
+            override_file="$(mktemp /tmp/eta-compose-override.XXXXXX.yaml)"
+            trap 'rm -f "$override_file"' EXIT
+            cat > "$override_file" <<EOF
+            services:
+              migration:
+                image: ghcr.io/$image_owner/eta_backend:$IMAGE_TAG
+              backend:
+                image: ghcr.io/$image_owner/eta_backend:$IMAGE_TAG
+              celery_worker:
+                image: ghcr.io/$image_owner/eta_backend:$IMAGE_TAG
+              celery_beat:
+                image: ghcr.io/$image_owner/eta_backend:$IMAGE_TAG
+              frontend:
+                image: ghcr.io/$image_owner/eta_frontend:$IMAGE_TAG
+            EOF
+            docker compose -f docker-compose.yml -f "$override_file" --env-file .env config --quiet
+            docker compose -f docker-compose.yml -f "$override_file" --env-file .env pull
+            docker compose -f docker-compose.yml -f "$override_file" --env-file .env up -d --remove-orphans
+
+      - name: Verify public production routes
+        env:
+          BASE_URL: https://eta.althech.com
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 6 --retry-delay 5 "$BASE_URL/" \
+            | grep -qi '<title>Expense Tracker</title>'
+
+          auth_options="$(curl --fail --silent --show-error --retry 6 --retry-delay 5 "$BASE_URL/api/auth/options/")"
+          printf '%s' "$auth_options" | jq -e '
+            (.providers.google.configured | type == "boolean") and
+            (.providers.apple.configured | type == "boolean")
+          ' >/dev/null
+
+          admin_page="$(curl --fail --silent --show-error --location --retry 6 --retry-delay 5 "$BASE_URL/etaalthech2026/")"
+          printf '%s' "$admin_page" | grep -q 'id_username'

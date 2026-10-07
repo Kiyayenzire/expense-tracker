@@ -84,6 +84,28 @@ describe('ExpenseForm unit tests', () => {
     expect(screen.getByRole('button', { name: /edit/i })).toBeInTheDocument();
   });
 
+  it('allows changing the subcategory when editing an expense', async () => {
+    const user = userEvent.setup();
+    const client = { patch: vi.fn().mockResolvedValue({ data: {} }) };
+
+    render(
+      <ExpenseTable
+        expenses={[{ id: 99, date: '2026-09-02', category: 1, subcategory: 10, category_name: 'Food', subcategory_name: 'Groceries', item_description: 'Rice', measurement: 'kg', amount: '12.50', quantity: '1', currency: 1, currency_code: 'EUR' }]}
+        displayCurrency="EUR"
+        categories={[{ id: 1, name: 'Food' }]}
+        subcategories={[{ id: 10, name: 'Groceries', category: 1 }, { id: 11, name: 'Restaurants', category: 1 }]}
+        currencies={[{ id: 1, code: 'EUR', symbol: '€' }]}
+        client={client}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /edit/i }));
+    await user.selectOptions(screen.getByRole('combobox', { name: /subcategory/i }), '11');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => expect(client.patch).toHaveBeenCalledWith('/expenses/99/', expect.objectContaining({ subcategory: 11 })));
+  });
+
   it('shows eleven expenses per page', async () => {
     const user = userEvent.setup();
     const expenses = Array.from({ length: 12 }, (_, index) => ({
@@ -167,6 +189,68 @@ describe('ExpenseForm unit tests', () => {
     await waitFor(() => {
       expect(screen.getByRole('img', { name: /profile/i })).toHaveAttribute('src', 'http://localhost:8000/media/new-avatar.png');
     });
+
+    fetchMock.mockRestore();
+  });
+
+  it('lets a social-only user create a password and confirm provider disconnection', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          username: 'alice',
+          email: 'alice@example.com',
+          has_usable_password: false,
+          social_providers: ['google'],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ detail: 'Password set successfully.' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ detail: 'Google has been disconnected.', social_providers: [] }),
+      });
+
+    render(
+      <ProfilePage
+        token="demo-token"
+        onLogout={vi.fn()}
+        theme="light"
+        setTheme={vi.fn()}
+        onNavigate={vi.fn()}
+        username="alice"
+        profilePicture=""
+        setProfilePicture={vi.fn()}
+        setUsername={vi.fn()}
+      />
+    );
+
+    await user.type(await screen.findByLabelText(/^new password$/i), 'StrongPassword9!');
+    await user.type(screen.getByLabelText(/^confirm new password$/i), 'StrongPassword9!');
+    await user.click(screen.getByRole('button', { name: /create password/i }));
+
+    expect(await screen.findByText(/password created/i)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/auth/password/set/', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({
+        new_password: 'StrongPassword9!',
+        confirm_password: 'StrongPassword9!',
+      }),
+    }));
+
+    await user.click(screen.getByRole('button', { name: /^disconnect$/i }));
+    await user.type(screen.getByLabelText(/account password/i), 'StrongPassword9!');
+    await user.click(screen.getByRole('button', { name: /confirm disconnect/i }));
+
+    expect(await screen.findByText(/google has been disconnected/i)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/auth/social/disconnect/', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ provider: 'google', password: 'StrongPassword9!' }),
+    }));
 
     fetchMock.mockRestore();
   });
