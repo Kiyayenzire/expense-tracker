@@ -158,17 +158,26 @@ jobs:
           BASE_URL: https://eta.althech.com
         run: |
           set -euo pipefail
-          echo "Waiting for Gunicorn to complete initialization..."
-          sleep 10
+          echo "Waiting for application to come online..."
 
-          curl --fail --silent --show-error --retry 10 --retry-delay 5 --retry-connrefused "$BASE_URL/" \
-            | grep -qi '<title>Expense Tracker</title>'
+          # Poll up to 60 seconds (12 attempts x 5s) until Nginx stops returning 502
+          for i in {1..12}; do
+            if curl --fail --silent "$BASE_URL/" >/dev/null 2>&1; then
+              echo "Application is online!"
+              break
+            fi
+            echo "Backend still initializing (attempt $i/12)..."
+            sleep 5
+          done
 
-          auth_options="$(curl --fail --silent --show-error --retry 10 --retry-delay 5 --retry-connrefused "$BASE_URL/api/auth/options/")"
+          # Execute verification assertions
+          curl --fail --silent --show-error "$BASE_URL/" | grep -qi '<title>Expense Tracker</title>'
+
+          auth_options="$(curl --fail --silent --show-error "$BASE_URL/api/auth/options/")"
           printf '%s' "$auth_options" | jq -e '
             (.providers.google.configured | type == "boolean") and
             (.providers.apple.configured | type == "boolean")
           ' >/dev/null
 
-          admin_page="$(curl --fail --silent --show-error --location --retry 10 --retry-delay 5 --retry-connrefused "$BASE_URL/etaalthech2026/")"
+          admin_page="$(curl --fail --silent --show-error --location "$BASE_URL/etaalthech2026/")"
           printf '%s' "$admin_page" | grep -q 'id_username'
