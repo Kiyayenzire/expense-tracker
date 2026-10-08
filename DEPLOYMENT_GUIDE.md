@@ -77,6 +77,8 @@ After CI passes on a push to `main`, the same workflow publishes images and depl
 
 The frontend Help & Support page sends email to `irislee.8154@gmail.com`. Override `VITE_SUPPORT_EMAIL` in the frontend environment or GitHub Actions repository variables only if the support address changes.
 
+For production email delivery, set `EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend`, `EMAIL_HOST=smtp.gmail.com`, `EMAIL_PORT=587`, `EMAIL_USE_TLS=True`, and valid `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, and `DEFAULT_FROM_EMAIL` values in the server's untracked `.env`. Set `REMINDER_RECIPIENT_EMAIL` to the mailbox that should receive currency reminders. If it is unset, the existing `CURRENCY_ADMIN_EMAIL` setting is used.
+
 ## Environment variables
 
 The project reads from the root `.env` file when present, and falls back to `.env.dev` when needed. The default development settings already contain:
@@ -311,11 +313,24 @@ docker compose -f docker-compose.yml --env-file .env exec redis redis-cli FLUSHD
 
 #### Update Currency Rates
 ```bash
-# Manual trigger (normally runs Monday 17:00 UTC)
+# Manually queue a rate update (normally scheduled Monday and Tuesday at 12:00 Europe/Berlin)
 docker compose -f docker-compose.yml --env-file .env exec backend python manage.py shell
 >>> from expenses.tasks import update_currency_rates
 >>> update_currency_rates.delay()
 ```
+
+When entering a manual EUR/UGX or USD/UGX rate in Django Admin, the **Manual** checkbox is checked automatically and cannot be cleared. The reverse pair is saved automatically as its reciprocal for the same effective date. Authenticated writes through the currency-rate API are also treated as manual entries; scheduled Celery rate updates remain automatic. Existing automatically generated rows for that date are updated in place.
+
+#### Test Currency Reminder Email
+```bash
+# Sends a test email immediately, regardless of weekday or existing rates
+docker compose -f docker-compose.yml --env-file .env exec backend python manage.py shell -c "from expenses.tasks import send_currency_update_reminder; send_currency_update_reminder.run(force_send=True)"
+
+# Runs the normal weekly check immediately
+docker compose -f docker-compose.yml --env-file .env exec backend python manage.py shell -c "from expenses.tasks import send_currency_update_reminder; send_currency_update_reminder.run()"
+```
+
+The normal check sends reminders only for EUR/UGX or USD/UGX pairs without a manual rate for the current week. Automatically generated rates are not treated as confirmation of a manual update.
 
 #### Restart Services
 ```bash

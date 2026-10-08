@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 from .models import Category, SubCategory, Item, Currency, ExpenseEntry, CurrencyRate
 
@@ -34,10 +36,28 @@ class CurrencySerializer(serializers.ModelSerializer):
 class CurrencyRateSerializer(serializers.ModelSerializer):
     base_currency_code = serializers.CharField(source='base_currency.code', read_only=True)
     target_currency_code = serializers.CharField(source='target_currency.code', read_only=True)
+    is_manual = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = CurrencyRate
-        fields = ['id', 'base_currency', 'base_currency_code', 'target_currency', 'target_currency_code', 'rate', 'effective_date', 'created_at']
+        fields = ['id', 'base_currency', 'base_currency_code', 'target_currency', 'target_currency_code', 'rate', 'effective_date', 'created_at', 'is_manual']
+        read_only_fields = ['is_manual']
+
+    def validate_rate(self, value):
+        if value <= 0:
+            raise serializers.ValidationError('Exchange rates must be greater than zero.')
+        reciprocal_rate = Decimal('1') / value
+        if reciprocal_rate > Decimal('99999.99999999999'):
+            raise serializers.ValidationError('The reciprocal rate exceeds the supported precision.')
+        return value
+
+    def create(self, validated_data):
+        return CurrencyRate(**validated_data).save_as_manual()
+
+    def update(self, instance, validated_data):
+        for attribute, value in validated_data.items():
+            setattr(instance, attribute, value)
+        return instance.save_as_manual()
 
 
 class ExpenseEntrySerializer(serializers.ModelSerializer):

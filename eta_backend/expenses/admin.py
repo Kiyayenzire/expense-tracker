@@ -1,9 +1,11 @@
 from datetime import timedelta
+from decimal import Decimal
 
 from django import forms
 from django.contrib import admin
 from .models import Category, SubCategory, Item, Currency, CurrencyRate, ExpenseEntry
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.utils import timezone
 
 admin.site.register(Category)
@@ -22,6 +24,12 @@ class CurrencyRateAdmin(admin.ModelAdmin):
 				model = CurrencyRate
 				fields = '__all__'
 
+			def __init__(self, *args, **form_kwargs):
+				super().__init__(*args, **form_kwargs)
+				self.initial['is_manual'] = True
+				self.fields['is_manual'].initial = True
+				self.fields['is_manual'].disabled = True
+
 			def clean(self):
 				cleaned_data = super().clean()
 				base = cleaned_data.get('base_currency')
@@ -37,6 +45,14 @@ class CurrencyRateAdmin(admin.ModelAdmin):
 					if pair not in allowed_pairs:
 						raise ValidationError('Manual weekly rates are only allowed for EUR/UGX, USD/UGX, UGX/EUR, and UGX/USD.')
 
+				rate = cleaned_data.get('rate')
+				if rate is not None and rate <= 0:
+					raise ValidationError('Exchange rates must be greater than zero.')
+				if rate is not None:
+					reciprocal_rate = (Decimal('1') / rate).quantize(Decimal('0.0000000000001'))
+					if reciprocal_rate > Decimal('99999.99999999999'):
+						raise ValidationError('The reciprocal rate exceeds the supported precision.')
+
 				if today.weekday() > 4:
 					raise ValidationError('Weekly exchange-rate updates are locked after Friday. Update again next Monday.')
 
@@ -47,7 +63,10 @@ class CurrencyRateAdmin(admin.ModelAdmin):
 					'effective_date__lte': window_end,
 					'is_manual': True,
 				}
-				if base and target and CurrencyRate.objects.filter(**manual_filter).exists():
+				existing_manual_rates = CurrencyRate.objects.filter(**manual_filter)
+				if obj and obj.pk:
+					existing_manual_rates = existing_manual_rates.exclude(pk=obj.pk)
+				if base and target and existing_manual_rates.exists():
 					raise ValidationError('A manual rate for this pair was already recorded this week. Editing is locked until next Monday.')
 				if effective_date and not (week_start <= effective_date <= window_end):
 					raise ValidationError('The effective date must be a day from this Monday through Friday.')
@@ -55,8 +74,8 @@ class CurrencyRateAdmin(admin.ModelAdmin):
 
 		return WeeklyCurrencyRateForm
 
+	@transaction.atomic
 	def save_model(self, request, obj, form, change):
-		obj.is_manual = True
-		super().save_model(request, obj, form, change)
+		obj.save_as_manual()
 
 admin.site.register(ExpenseEntry)

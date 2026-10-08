@@ -1,6 +1,6 @@
 from decimal import Decimal
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 
 
 class Category(models.Model):
@@ -77,6 +77,37 @@ class CurrencyRate(models.Model):
     class Meta:
         unique_together = ('base_currency', 'target_currency', 'effective_date')
         ordering = ['-effective_date']
+
+    def save_as_manual(self):
+        if self.rate <= 0:
+            raise ValueError('Exchange rates must be greater than zero.')
+
+        reciprocal_rate = (Decimal('1') / self.rate).quantize(Decimal('0.0000000000001'))
+        with transaction.atomic():
+            direct, _ = type(self).objects.update_or_create(
+                base_currency=self.base_currency,
+                target_currency=self.target_currency,
+                effective_date=self.effective_date,
+                defaults={
+                    'rate': self.rate,
+                    'is_manual': True,
+                },
+            )
+            self.pk = direct.pk
+            self.created_at = direct.created_at
+            self.is_manual = True
+
+            if self.base_currency_id != self.target_currency_id:
+                type(self).objects.update_or_create(
+                    base_currency=self.target_currency,
+                    target_currency=self.base_currency,
+                    effective_date=self.effective_date,
+                    defaults={
+                        'rate': reciprocal_rate,
+                        'is_manual': True,
+                    },
+                )
+        return self
 
     def __str__(self):
         return f"{self.base_currency.code}->{self.target_currency.code} @ {self.effective_date}"

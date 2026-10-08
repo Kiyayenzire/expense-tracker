@@ -1,4 +1,5 @@
 import json
+import logging
 import urllib.request
 from datetime import timedelta
 from decimal import Decimal
@@ -11,6 +12,8 @@ from django.utils import timezone
 
 from .models import Currency, CurrencyRate
 from .services.prediction_service import ExpensePredictor
+
+logger = logging.getLogger(__name__)
 
 
 @shared_task
@@ -113,41 +116,63 @@ def update_currency_rates():
 
 
 @shared_task
-def send_currency_update_reminder():
+def send_currency_update_reminder(force_send=False):
     today = timezone.localdate()
     weekday = today.weekday()  # Monday = 0, Tuesday = 1
 
-    if weekday not in (0, 1):
+    if weekday not in (0, 1) and not force_send:
         return "Skipped: Reminders are only sent on Monday or Tuesday."
 
-    start_of_week = today - timedelta(days=weekday)
+    start_of_week = today - timedelta(days=today.weekday())
+    end_of_week = start_of_week + timedelta(days=6)
 
-    # BOTH USD->UGX AND EUR->UGX must be updated for this week to skip the reminder
-    usd_ugx_updated = CurrencyRate.objects.filter(
-        base_currency__code='USD',
-        target_currency__code='UGX',
-        effective_date__gte=start_of_week,
-    ).exists()
+    required_pairs = (('USD', 'UGX'), ('EUR', 'UGX'))
+    missing_pairs = [
+        f'{base}/{target}'
+        for base, target in required_pairs
+        if not CurrencyRate.objects.filter(
+            base_currency__code=base,
+            target_currency__code=target,
+            effective_date__gte=start_of_week,
+            effective_date__lte=end_of_week,
+            is_manual=True,
+        ).exists()
+    ]
 
-    eur_ugx_updated = CurrencyRate.objects.filter(
-        base_currency__code='EUR',
-        target_currency__code='UGX',
-        effective_date__gte=start_of_week,
-    ).exists()
-
-    if usd_ugx_updated and eur_ugx_updated:
+    if not missing_pairs and not force_send:
         return f"Skipped: Both USD/UGX and EUR/UGX exchange rates already updated for week of {start_of_week}."
 
-    recipient = getattr(settings, 'CURRENCY_ADMIN_EMAIL', getattr(settings, 'DEFAULT_FROM_EMAIL', None))
+    recipient = settings.REMINDER_RECIPIENT_EMAIL
     if not recipient:
         return "Error: No recipient email configured."
 
+    if force_send:
+        subject = "[TEST] Manual Exchange Rate Reminder Trigger"
+        missing_status = (
+            f"Missing manually updated rate pair(s): {', '.join(missing_pairs)}."
+            if missing_pairs
+            else "Both required manually updated rate pairs are present for the current week."
+        )
+        message = (
+            "This is a manual test of the exchange rate reminder email system.\n\n"
+            f"{missing_status}\n\n"
+            "This test email was sent because force_send=True."
+        )
+    else:
+        missing_str = ', '.join(missing_pairs)
+        subject = f"Action required: Missing exchange rates ({missing_str})"
+        message = (
+            f"The exchange rate update for the week of {start_of_week:%B %d, %Y} is incomplete.\n"
+            f"Missing manually updated rate pair(s): {missing_str}.\n\n"
+            "Please review or update the rates on https://eta.althech.com."
+        )
+
     send_mail(
-        subject=f"Reminder: Update Exchange Rates ({today.strftime('%A, %b %d, %Y')})",
-        message=f"Automated reminder to check and update both USD/UGX and EUR/UGX exchange rates for week starting {start_of_week}.",
+        subject=subject,
+        message=message,
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[recipient],
         fail_silently=False,
     )
-
+    logger.info("Exchange rate reminder email sent to %s.", recipient)
     return f"Reminder email sent to {recipient} for {today}."

@@ -264,6 +264,7 @@ EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER or 'no-reply@expense-tracker.local')
 SERVER_EMAIL = env('SERVER_EMAIL', default=DEFAULT_FROM_EMAIL)
 CURRENCY_ADMIN_EMAIL = env('CURRENCY_ADMIN_EMAIL', default=DEFAULT_FROM_EMAIL)
+REMINDER_RECIPIENT_EMAIL = env('REMINDER_RECIPIENT_EMAIL', default=CURRENCY_ADMIN_EMAIL)
 
 # ============================================================================== 
 # 7. EXTERNAL SERVICES AND CELERY CONFIGURATION
