@@ -98,7 +98,7 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: /api
-        VITE_SUPPORT_EMAIL: ${VITE_SUPPORT_EMAIL:-irislee.8154@gmail.com}
+        VITE_SUPPORT_EMAIL: ${VITE_SUPPORT_EMAIL:-zoelewis.58@gmail.com}
     container_name: eta_frontend
     restart: always
     ports:

@@ -187,7 +187,7 @@ Production keeps the existing host reverse proxy and Compose port mappings: Djan
 
 On a successful push to `main`, CI tests the backend and frontend, runs browser tests, builds and publishes images, then deploys those exact commit-tagged images through a temporary Compose override. The server's existing Compose file, ports, Nginx configuration, and persistent volumes are left unchanged. The workflow only reports green after the live website, auth-options endpoint, and Django Admin login page pass smoke checks.
 
-The support contact is `irislee.8154@gmail.com`. Set `VITE_SUPPORT_EMAIL` in `eta_frontend/.env` for local frontend builds. Production frontend images read the same value from the GitHub Actions repository variable `VITE_SUPPORT_EMAIL`; if unset, the frontend config fallback uses this address.
+The support contact is `zoelewis.58@gmail.com`. Set `VITE_SUPPORT_EMAIL` in `eta_frontend/.env` for local frontend builds. Production frontend images read the same value from the GitHub Actions repository variable `VITE_SUPPORT_EMAIL`; if unset, the frontend config fallback uses this address.
 
 ## Local development notes
 

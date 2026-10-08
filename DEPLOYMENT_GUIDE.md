@@ -75,9 +75,16 @@ Production uses the existing host reverse proxy and the server's Compose configu
 
 After CI passes on a push to `main`, the same workflow publishes images and deploys the exact tested commit using a temporary Compose override. It does not copy or replace the server's `docker-compose.yml` or Nginx files, and does not remove or recreate persistent volumes. The run is green only if post-deployment checks confirm the website, `/api/auth/options/`, and the Django Admin login page respond as expected.
 
-The frontend Help & Support page sends email to `irislee.8154@gmail.com`. Override `VITE_SUPPORT_EMAIL` in the frontend environment or GitHub Actions repository variables only if the support address changes.
+The frontend Help & Support page sends email to `zoelewis.58@gmail.com`. Override `VITE_SUPPORT_EMAIL` in the frontend environment or GitHub Actions repository variables only if the support address changes.
 
-For production email delivery, set `EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend`, `EMAIL_HOST=smtp.gmail.com`, `EMAIL_PORT=587`, `EMAIL_USE_TLS=True`, and valid `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, and `DEFAULT_FROM_EMAIL` values in the server's untracked `.env`. Set `REMINDER_RECIPIENT_EMAIL` to the mailbox that should receive currency reminders. If it is unset, the existing `CURRENCY_ADMIN_EMAIL` setting is used.
+For production email delivery where outbound SMTP is blocked, use Resend over HTTPS. Add `EMAIL_BACKEND=anymail.backends.resend.EmailBackend` and `RESEND_API_KEY` to the server's untracked `.env`; set `DEFAULT_FROM_EMAIL` to a sender address accepted by Resend and set `REMINDER_RECIPIENT_EMAIL` to the mailbox that should receive currency reminders. If the reminder recipient is unset, the existing `CURRENCY_ADMIN_EMAIL` setting is used. The production image installs `django-anymail[resend]` from `eta_backend/requirements/prod.txt`. For delivery to arbitrary recipients, verify your sending domain in Resend and use an address on that domain as the sender; the `onboarding@resend.dev` sender is for limited testing.
+
+After deploying the image and updating `.env`, recreate the backend and Celery containers so they receive the new environment values:
+
+```bash
+docker compose up -d --force-recreate backend celery_worker celery_beat
+docker compose exec backend python manage.py shell -c "from expenses.tasks import send_currency_update_reminder; print(send_currency_update_reminder.run(force_send=True))"
+```
 
 ## Environment variables
 

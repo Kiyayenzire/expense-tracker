@@ -1,2 +1,3 @@
 -r base.txt
+django-anymail[resend]>=12.0,<14.0
 gunicorn>=21.2
