@@ -158,14 +158,17 @@ jobs:
           BASE_URL: https://eta.althech.com
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --retry 6 --retry-delay 5 "$BASE_URL/" \
+          echo "Waiting for Gunicorn to complete initialization..."
+          sleep 10
+
+          curl --fail --silent --show-error --retry 10 --retry-delay 5 --retry-connrefused "$BASE_URL/" \
             | grep -qi '<title>Expense Tracker</title>'
 
-          auth_options="$(curl --fail --silent --show-error --retry 6 --retry-delay 5 "$BASE_URL/api/auth/options/")"
+          auth_options="$(curl --fail --silent --show-error --retry 10 --retry-delay 5 --retry-connrefused "$BASE_URL/api/auth/options/")"
           printf '%s' "$auth_options" | jq -e '
             (.providers.google.configured | type == "boolean") and
             (.providers.apple.configured | type == "boolean")
           ' >/dev/null
 
-          admin_page="$(curl --fail --silent --show-error --location --retry 6 --retry-delay 5 "$BASE_URL/etaalthech2026/")"
+          admin_page="$(curl --fail --silent --show-error --location --retry 10 --retry-delay 5 --retry-connrefused "$BASE_URL/etaalthech2026/")"
           printf '%s' "$admin_page" | grep -q 'id_username'
