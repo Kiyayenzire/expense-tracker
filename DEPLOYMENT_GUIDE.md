@@ -319,7 +319,7 @@ docker compose -f docker-compose.yml --env-file .env exec backend python manage.
 >>> update_currency_rates.delay()
 ```
 
-When entering a manual EUR/UGX or USD/UGX rate in Django Admin, the **Manual** checkbox is checked automatically and cannot be cleared. The reverse pair is saved automatically as its reciprocal for the same effective date. Authenticated writes through the currency-rate API are also treated as manual entries; scheduled Celery rate updates remain automatic. Existing automatically generated rows for that date are updated in place.
+When entering a manual EUR/UGX or USD/UGX rate in Django Admin, the **Effective date** defaults to today; an earlier date can be selected, but future dates are rejected. The **Manual** checkbox is checked automatically and cannot be cleared. The reverse pair is saved automatically as its reciprocal for the same effective date. Authenticated writes through the currency-rate API are also treated as manual entries; scheduled Celery rate updates remain automatic. Existing automatically generated rows for that date are updated in place.
 
 #### Test Currency Reminder Email
 ```bash

@@ -251,6 +251,45 @@ class CurrencyTaskTestCase(TestCase):
 
         self.assertTrue(form['is_manual'].value())
         self.assertTrue(form.fields['is_manual'].disabled)
+        self.assertEqual(form['effective_date'].value(), timezone.localdate())
+
+    def test_admin_rate_form_accepts_past_effective_date_and_rejects_future_date(self):
+        form_class = CurrencyRateAdmin(model=CurrencyRate, admin_site=None).get_form(None)
+        past_date = timezone.localdate() - timedelta(days=7)
+        past_form = form_class(data={
+            'base_currency': self.usd.pk,
+            'target_currency': self.ugx.pk,
+            'rate': '4055',
+            'effective_date': past_date.isoformat(),
+            'is_manual': 'on',
+        })
+        future_form = form_class(data={
+            'base_currency': self.usd.pk,
+            'target_currency': self.ugx.pk,
+            'rate': '4055',
+            'effective_date': (timezone.localdate() + timedelta(days=1)).isoformat(),
+            'is_manual': 'on',
+        })
+
+        self.assertTrue(past_form.is_valid(), past_form.errors)
+        self.assertFalse(future_form.is_valid())
+        self.assertIn('future', str(future_form.errors).lower())
+
+    def test_admin_rate_form_allows_manual_updates_wednesday_through_friday(self):
+        form_class = CurrencyRateAdmin(model=CurrencyRate, admin_site=None).get_form(None)
+
+        for weekday in (2, 3, 4):
+            with self.subTest(weekday=weekday):
+                update_date = self.start_of_week + timedelta(days=weekday)
+                with patch('django.utils.timezone.localdate', return_value=update_date):
+                    form = form_class(data={
+                        'base_currency': self.usd.pk,
+                        'target_currency': self.ugx.pk,
+                        'rate': '4055',
+                        'effective_date': update_date.isoformat(),
+                        'is_manual': 'on',
+                    })
+                    self.assertTrue(form.is_valid(), form.errors)
 
     def test_api_rate_entry_is_manual_and_saves_reciprocal(self):
         serializer = CurrencyRateSerializer(data={

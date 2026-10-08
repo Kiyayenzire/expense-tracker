@@ -1,4 +1,3 @@
-from datetime import timedelta
 from decimal import Decimal
 
 from django import forms
@@ -26,6 +25,7 @@ class CurrencyRateAdmin(admin.ModelAdmin):
 
 			def __init__(self, *args, **form_kwargs):
 				super().__init__(*args, **form_kwargs)
+				self.initial.setdefault('effective_date', timezone.localdate())
 				self.initial['is_manual'] = True
 				self.fields['is_manual'].initial = True
 				self.fields['is_manual'].disabled = True
@@ -36,8 +36,6 @@ class CurrencyRateAdmin(admin.ModelAdmin):
 				target = cleaned_data.get('target_currency')
 				effective_date = cleaned_data.get('effective_date')
 				today = timezone.localdate()
-				week_start = today - timedelta(days=today.weekday())
-				window_end = week_start + timedelta(days=4)
 				allowed_pairs = {('EUR', 'UGX'), ('USD', 'UGX'), ('UGX', 'EUR'), ('UGX', 'USD')}
 
 				if base and target:
@@ -53,23 +51,20 @@ class CurrencyRateAdmin(admin.ModelAdmin):
 					if reciprocal_rate > Decimal('99999.99999999999'):
 						raise ValidationError('The reciprocal rate exceeds the supported precision.')
 
-				if today.weekday() > 4:
-					raise ValidationError('Weekly exchange-rate updates are locked after Friday. Update again next Monday.')
+				if effective_date and effective_date > today:
+					raise ValidationError('The effective date cannot be in the future.')
 
-				manual_filter = {
-					'base_currency__code': base.code if base else None,
-					'target_currency__code': target.code if target else None,
-					'effective_date__gte': week_start,
-					'effective_date__lte': window_end,
-					'is_manual': True,
-				}
-				existing_manual_rates = CurrencyRate.objects.filter(**manual_filter)
-				if obj and obj.pk:
-					existing_manual_rates = existing_manual_rates.exclude(pk=obj.pk)
-				if base and target and existing_manual_rates.exists():
-					raise ValidationError('A manual rate for this pair was already recorded this week. Editing is locked until next Monday.')
-				if effective_date and not (week_start <= effective_date <= window_end):
-					raise ValidationError('The effective date must be a day from this Monday through Friday.')
+				if base and target and effective_date:
+					existing_manual_rates = CurrencyRate.objects.filter(
+						base_currency=base,
+						target_currency=target,
+						effective_date=effective_date,
+						is_manual=True,
+					)
+					if obj and obj.pk:
+						existing_manual_rates = existing_manual_rates.exclude(pk=obj.pk)
+					if existing_manual_rates.exists():
+						raise ValidationError('A manual rate for this pair and effective date already exists.')
 				return cleaned_data
 
 		return WeeklyCurrencyRateForm
