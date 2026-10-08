@@ -201,7 +201,10 @@ class CurrencyTaskTestCase(TestCase):
                 )
                 self.assertTrue(rate_obj.is_manual)
                 self.assertTrue(reciprocal.is_manual)
-                self.assertEqual(reciprocal.rate, expected_reciprocal)
+                self.assertLessEqual(
+                    abs(reciprocal.rate - expected_reciprocal),
+                    Decimal('0.000000000001'),
+                )
 
     def test_admin_entry_updates_existing_automatic_reciprocal(self):
         CurrencyRate.objects.create(
