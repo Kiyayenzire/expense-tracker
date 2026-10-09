@@ -76,37 +76,30 @@ class TestAccountsLoginAPIContract:
         FRONTEND_URL='http://localhost:5174',
     )
     def test_registration_requires_email_confirmation_before_login(self, api_client):
-        with patch('accounts.views.send_registration_verification_email.delay') as queued_registration_email:
-            response = api_client.post(
-                '/api/auth/registration/',
-                {
-                    'username': 'pendinguser',
-                    'email': 'pending@example.com',
-                    'password1': 'StrongPassword1!',
-                    'password2': 'StrongPassword1!',
-                },
-                format='json',
-            )
+        response = api_client.post(
+            '/api/auth/registration/',
+            {
+                'username': 'pendinguser',
+                'email': 'pending@example.com',
+                'password1': 'StrongPassword1!',
+                'password2': 'StrongPassword1!',
+            },
+            format='json',
+        )
 
         assert response.status_code in (status.HTTP_200_OK, status.HTTP_201_CREATED)
         user = User.objects.get(username='pendinguser')
         assert user.is_active is False
         email_address = EmailAddress.objects.get(user=user)
         assert email_address.verified is False
-        queued_registration_email.assert_called_once_with(email_address.pk)
-        from accounts.tasks import send_registration_verification_email
-        assert send_registration_verification_email.run(email_address.pk) is True
-        assert mail.outbox
+        assert len(mail.outbox) == 1
 
-        with patch('accounts.views.send_registration_verification_email.delay') as queued_email:
-            resend_response = api_client.post(
-                '/api/auth/registration/resend-email/',
-                {'email': 'pending@example.com'},
-                format='json',
-            )
-        queued_email.assert_called_once_with(email_address.pk)
+        resend_response = api_client.post(
+            '/api/auth/registration/resend-email/',
+            {'email': 'pending@example.com'},
+            format='json',
+        )
         assert resend_response.status_code == status.HTTP_200_OK
-        assert send_registration_verification_email.run(email_address.pk) is True
         assert len(mail.outbox) == 2
         verification_match = re.search(r'#/verify-email/([^\s]+)', mail.outbox[-1].body)
         assert verification_match
@@ -161,28 +154,40 @@ class TestAccountsLoginAPIContract:
         EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
         FRONTEND_URL='http://localhost:5174',
     )
+    def test_verification_send_failure_is_returned_to_authenticated_user(self, authenticated_client):
+        with patch('accounts.tasks.send_mail', side_effect=OSError('SMTP unavailable')):
+            with patch('django.core.handlers.base.log_response'):
+                response = authenticated_client.post(
+                    '/api/auth/registration/resend-email/',
+                    format='json',
+                )
+
+        assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        assert 'could not send' in response.json()['detail'].lower()
+
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+        FRONTEND_URL='http://localhost:5174',
+    )
     def test_active_unverified_account_can_resend_verification(self, authenticated_client, test_user):
         anonymous_client = APIClient()
-        with patch('accounts.views.send_registration_verification_email.delay') as public_queue:
-            public_response = anonymous_client.post(
-                '/api/auth/registration/resend-email/',
-                {'email': test_user.email},
-                format='json',
-            )
+        public_response = anonymous_client.post(
+            '/api/auth/registration/resend-email/',
+            {'email': test_user.email},
+            format='json',
+        )
         assert public_response.status_code == status.HTTP_200_OK
-        public_queue.assert_not_called()
         assert not EmailAddress.objects.filter(user=test_user).exists()
 
-        with patch('accounts.views.send_registration_verification_email.delay') as queued_email:
-            response = authenticated_client.post(
-                '/api/auth/registration/resend-email/',
-                format='json',
-            )
+        response = authenticated_client.post(
+            '/api/auth/registration/resend-email/',
+            format='json',
+        )
 
         address = EmailAddress.objects.get(user=test_user)
         assert response.status_code == status.HTTP_200_OK
         assert address.verified is False
-        queued_email.assert_called_once_with(address.pk)
+        assert len(mail.outbox) == 1
 
     def test_registration_rejects_invalid_email_address(self, api_client):
         response = api_client.post(
@@ -207,18 +212,17 @@ class TestAccountsLoginAPIContract:
             'password1': 'StrongPassword1!',
             'password2': 'StrongPassword1!',
         }
-        with patch('accounts.views.send_registration_verification_email.delay'):
-            first_response = api_client.post(
-                '/api/auth/registration/',
-                payload,
-                format='json',
-            )
-            payload['username'] = 'second-email-user'
-            duplicate_response = api_client.post(
-                '/api/auth/registration/',
-                payload,
-                format='json',
-            )
+        first_response = api_client.post(
+            '/api/auth/registration/',
+            payload,
+            format='json',
+        )
+        payload['username'] = 'second-email-user'
+        duplicate_response = api_client.post(
+            '/api/auth/registration/',
+            payload,
+            format='json',
+        )
 
         assert first_response.status_code == status.HTTP_201_CREATED
         assert duplicate_response.status_code == status.HTTP_400_BAD_REQUEST

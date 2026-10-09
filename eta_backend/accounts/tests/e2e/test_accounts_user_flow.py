@@ -19,22 +19,21 @@ class TestAccountsUserFlow:
         FRONTEND_URL='http://localhost:5174',
     )
     def test_account_registration_and_profile_flow(self, api_client):
-        with patch('accounts.views.send_registration_verification_email.delay'):
-            response = api_client.post(
-                '/api/auth/registration/',
-                {
-                    'username': 'newuser',
-                    'email': 'newuser@example.com',
-                    'password1': 'StrongPassword1!',
-                    'password2': 'StrongPassword1!',
-                },
-                format='json',
-            )
+        response = api_client.post(
+            '/api/auth/registration/',
+            {
+                'username': 'newuser',
+                'email': 'newuser@example.com',
+                'password1': 'StrongPassword1!',
+                'password2': 'StrongPassword1!',
+            },
+            format='json',
+        )
         assert response.status_code == status.HTTP_201_CREATED
         new_user = __import__('django.contrib.auth', fromlist=['get_user_model']).get_user_model().objects.get(username='newuser')
         email_address = EmailAddress.objects.get(user=new_user)
-        from accounts.tasks import send_registration_verification_email
-        assert send_registration_verification_email.run(email_address.pk) is True
+        assert email_address.verified is False
+        assert len(mail.outbox) == 1
         verification_key = unquote(re.search(r'#/verify-email/([^\s]+)', mail.outbox[-1].body).group(1))
         with patch('allauth.account.adapter.DefaultAccountAdapter.add_message'):
             verify_response = api_client.post('/api/auth/registration/verify-email/', {'key': verification_key}, format='json')

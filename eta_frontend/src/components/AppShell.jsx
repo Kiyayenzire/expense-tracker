@@ -8,6 +8,7 @@ import { SummaryGrid } from './SummaryGrid';
 export function AppShell({ token, onLogout, theme, setTheme, onNavigate, onDeleteAccount, activePage, username, profilePicture, currentUser, verificationNotice, children, displayCurrency, setDisplayCurrency }) {
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState('');
+  const [verificationSent, setVerificationSent] = useState(false);
   const [isResendingVerification, setIsResendingVerification] = useState(false);
   const client = useMemo(() => createClient(token), [token]);
   const dashboard = useDashboardData(client, displayCurrency, onLogout);
@@ -19,7 +20,8 @@ export function AppShell({ token, onLogout, theme, setTheme, onNavigate, onDelet
     setVerificationMessage('');
     try {
       await client.post('/auth/registration/resend-email/', { email: currentUser.email });
-      setVerificationMessage('If your email address is still unverified, a verification link has been sent.');
+      setVerificationSent(true);
+      setVerificationMessage('Verification email sent. Please check your inbox or spam folder.');
     } catch (error) {
       setVerificationMessage(error.response?.data?.detail || 'We could not send a verification link. Please try again shortly.');
     } finally {
@@ -54,14 +56,16 @@ export function AppShell({ token, onLogout, theme, setTheme, onNavigate, onDelet
             <p>Verify your email to keep full access to your account.</p>
             {verificationMessage && <p className="verification-feedback">{verificationMessage}</p>}
           </div>
-          <button
-            type="button"
-            className="secondary-action-button"
-            onClick={resendVerification}
-            disabled={isResendingVerification}
-          >
-            {isResendingVerification ? 'Sending…' : 'Resend verification email'}
-          </button>
+          {!verificationSent && (
+            <button
+              type="button"
+              className="secondary-action-button"
+              onClick={resendVerification}
+              disabled={isResendingVerification}
+            >
+              {isResendingVerification ? 'Sending…' : 'Resend verification email'}
+            </button>
+          )}
         </section>
       )}
       <div className="summary-menu-row">

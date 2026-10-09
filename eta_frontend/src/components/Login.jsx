@@ -162,7 +162,7 @@ function Login({ onLogin, onNavigate }) {
     clearErrors();
     try {
       await axios.post(`${apiBase}/auth/registration/resend-email/`, { email: pendingVerificationEmail });
-      setSuccess('A new verification email has been sent. Check your inbox and spam folder.');
+      setSuccess('A new verification email has been sent. Check your inbox or spam folder.');
     } catch (error) {
       setGeneralError(getApiErrorMessage(error.response?.data, 'We could not resend the verification email. Try again shortly.'));
     } finally {

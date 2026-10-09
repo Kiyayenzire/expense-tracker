@@ -25,7 +25,7 @@ from rest_framework.response import Response
 from allauth.account.models import get_emailconfirmation_model
 
 from .serializers import EmailVerificationRegisterSerializer, UserProfileSerializer
-from .tasks import send_registration_verification_email
+from .tasks import send_registration_verification_email_now
 
 User = get_user_model()
 
@@ -107,10 +107,11 @@ def register_user(request):
     email_address = EmailAddress.objects.get(user=user, email__iexact=user.email)
 
     try:
-        send_registration_verification_email.delay(email_address.pk)
+        if not send_registration_verification_email_now(email_address.pk):
+            raise RuntimeError('The verification email address is no longer available.')
     except Exception:
         return Response({
-            'detail': 'Your account is pending verification, but we could not queue the email. Please use resend verification email to try again.',
+            'detail': 'Your account is pending verification, but we could not send the email. Please use resend verification email to try again.',
             'email': user.email,
             'verification_pending': True,
         }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
@@ -143,14 +144,19 @@ def resend_registration_verification(request):
 
     if address and not address.verified:
         try:
-            send_registration_verification_email.delay(address.pk)
+            if not send_registration_verification_email_now(address.pk):
+                raise RuntimeError('The verification email address is no longer available.')
         except Exception:
             return Response({
-                'detail': 'We could not queue the verification email. Please try again shortly.'
+                'detail': 'We could not send the verification email. Please try again shortly.'
             }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
     return Response({
-        'detail': 'If this email belongs to an unverified account, a verification email has been sent.'
+        'detail': (
+            'Verification email sent.'
+            if request.user.is_authenticated
+            else 'If this email belongs to an unverified account, a verification email has been sent.'
+        )
     }, status=status.HTTP_200_OK)
 
 

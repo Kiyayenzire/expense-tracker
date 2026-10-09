@@ -37,7 +37,7 @@ describe('AppShell email verification notice', () => {
     expect(screen.queryByText(/private@example\.com/i)).not.toBeInTheDocument();
   });
 
-  it('resends verification and displays the generic confirmation', async () => {
+  it('resends verification, confirms it was sent, and hides the resend button', async () => {
     post.mockResolvedValue({ data: {} });
     render(
       <AppShell
@@ -51,7 +51,8 @@ describe('AppShell email verification notice', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /resend verification email/i }));
 
-    expect(await screen.findByText(/if your email address is still unverified/i)).toBeInTheDocument();
+    expect(await screen.findByText(/verification email sent\. please check your inbox or spam folder/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /resend verification email/i })).not.toBeInTheDocument();
     expect(post).toHaveBeenCalledWith('/auth/registration/resend-email/', { email: 'private@example.com' });
   });
 
