@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createClient } from '../api';
 import { useDashboardData } from '../hooks/useDashboardData';
+import { useOfflineSync } from '../hooks/useOfflineSync';
 import { Header } from './Header';
 import { SummaryGrid } from './SummaryGrid';
 
-export function AppShell({ token, onLogout, theme, setTheme, onNavigate, username, profilePicture, children, displayCurrency, setDisplayCurrency }) {
+export function AppShell({ token, onLogout, theme, setTheme, onNavigate, onDeleteAccount, activePage, username, profilePicture, children, displayCurrency, setDisplayCurrency }) {
   const [summaryOpen, setSummaryOpen] = useState(false);
   const client = useMemo(() => createClient(token), [token]);
   const dashboard = useDashboardData(client, displayCurrency, onLogout);
+  const { queuedCount, isSyncing } = useOfflineSync(client);
   const selectedCurrency = dashboard.currencies.find((currency) => currency.code === displayCurrency);
 
   useEffect(() => {
@@ -20,8 +22,15 @@ export function AppShell({ token, onLogout, theme, setTheme, onNavigate, usernam
   }, [summaryOpen]);
 
   return (
-    <div className={summaryOpen ? 'container app-shell summary-drawer-open' : 'container app-shell'}>
-      <Header activePage="summary" onNavigate={onNavigate} onLogout={onLogout} theme={theme} setTheme={setTheme} username={username} profilePicture={profilePicture} />
+    <div
+      className={[
+        'container',
+        'app-shell',
+        activePage === 'dashboard' ? 'dashboard-shell' : '',
+        summaryOpen ? 'summary-drawer-open' : '',
+      ].filter(Boolean).join(' ')}
+    >
+      <Header activePage={activePage} onNavigate={onNavigate} onLogout={onLogout} onDeleteAccount={onDeleteAccount} theme={theme} setTheme={setTheme} username={username} profilePicture={profilePicture} queuedCount={queuedCount} isSyncing={isSyncing} />
       <div className="summary-menu-row">
         <button type="button" className="summary-menu-button" aria-label="Open summary navigation" aria-controls="summary-sidebar" aria-expanded={summaryOpen} onClick={() => setSummaryOpen((open) => !open)}>☰ <span>Summary</span></button>
       </div>
@@ -42,11 +51,10 @@ export function AppShell({ token, onLogout, theme, setTheme, onNavigate, usernam
           </div>
           <SummaryGrid onNavigate={(page) => { setSummaryOpen(false); onNavigate(page); }} />
         </aside>
-        <main className="dashboard-main app-page-main">
-          {children}
-        </main>
+        <div className="dashboard-main app-page-main">
+          {typeof children === 'function' ? children({ dashboard, queuedCount, isSyncing }) : children}
+        </div>
       </div>
-      {summaryOpen && <button type="button" className="sidebar-backdrop" aria-label="Close summary navigation" onClick={() => setSummaryOpen(false)} />}
     </div>
   );
 }

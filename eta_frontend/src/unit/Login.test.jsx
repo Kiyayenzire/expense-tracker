@@ -40,15 +40,19 @@ describe('Login unit tests', () => {
     const user = userEvent.setup();
     render(<Login onLogin={() => {}} />);
 
-    expect(screen.getByRole('button', { name: /google/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /apple/i })).toBeInTheDocument();
+    const googleButton = screen.getByRole('button', { name: 'Continue with Google' });
+    const appleButton = screen.getByRole('button', { name: 'Continue with Apple' });
+    expect(googleButton).toBeInTheDocument();
+    expect(appleButton).toBeInTheDocument();
     expect(document.querySelector('.fa-google')).toBeInTheDocument();
     expect(document.querySelector('.fa-apple')).toBeInTheDocument();
+    expect(googleButton).not.toHaveTextContent('Google');
+    expect(appleButton).not.toHaveTextContent('Apple');
 
     await user.click(screen.getByRole('button', { name: /sign up/i }));
 
-    expect(screen.getByRole('button', { name: /google/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /apple/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continue with Google' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continue with Apple' })).toBeInTheDocument();
   });
 
   it('does not report providers as unconfigured when the status request fails', async () => {
@@ -58,7 +62,7 @@ describe('Login unit tests', () => {
     render(<Login onLogin={() => {}} />);
 
     expect(await screen.findByRole('status')).toHaveTextContent(/availability could not be checked/i);
-    await user.click(screen.getByRole('button', { name: /google/i }));
+    await user.click(screen.getByRole('button', { name: 'Continue with Google' }));
 
     expect(screen.getByText(/could not check social sign-in configuration/i)).toBeInTheDocument();
   });
@@ -76,7 +80,7 @@ describe('Login unit tests', () => {
     });
 
     render(<Login onLogin={() => {}} />);
-    await user.click(screen.getByRole('button', { name: /google/i }));
+    await user.click(screen.getByRole('button', { name: 'Continue with Google' }));
 
     expect(screen.getByText(/google sign-in is not configured yet/i)).toBeInTheDocument();
   });

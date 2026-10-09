@@ -58,24 +58,24 @@ export function Header({
 
         <div className="header-tools">
           {/* Theme Selector */}
-          <div className="theme-selector">
-            <label htmlFor="theme-select" className="sr-only">
-              Select app theme
-            </label>
-            <select
-              id="theme-select"
-              aria-label="Select app theme"
-              value={theme}
-              onChange={(event) => setTheme(event.target.value)}
-            >
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-              <option value="gold">Gold</option>
-              <option value="blue">Blue</option>
-              <option value="green">Green</option>
-              <option value="red">Red</option>
-              <option value="purple">Purple</option>
-            </select>
+          <div className="theme-selector" role="group" aria-label="Theme">
+            {[
+              { name: 'light', label: 'Light', icon: '☀' },
+              { name: 'dark', label: 'Dark', icon: '☾' },
+              { name: 'gold', label: 'Gold', icon: '✦' },
+            ].map((option) => (
+              <button
+                key={option.name}
+                type="button"
+                className={`theme-button theme-button-${option.name}${theme === option.name ? ' active' : ''}`}
+                aria-label={`${option.label} theme`}
+                title={`${option.label} theme`}
+                aria-pressed={theme === option.name}
+                onClick={() => setTheme(option.name)}
+              >
+                <span aria-hidden="true">{option.icon}</span>
+              </button>
+            ))}
           </div>
 
           {/* User Profile Dropdown Menu */}
@@ -89,13 +89,14 @@ export function Header({
             >
               <div className="profile-picture">
                 {displayPicture ? (
-                  <img src={displayPicture} alt={username || 'User'} title={username || 'User'} />
+                  <img src={displayPicture} alt="" />
                 ) : (
-                  <div className="profile-avatar" title={username || 'User'}>
+                  <div className="profile-avatar" aria-hidden="true">
                     {initials}
                   </div>
                 )}
               </div>
+              <span className="profile-button-label">Profile</span>
               <span className="profile-chevron" aria-hidden="true">
                 ▾
               </span>

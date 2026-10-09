@@ -72,4 +72,12 @@ describe('CategorySummary unit tests', () => {
     render(<SpendingChart chartData={{ expensive: [], least: [] }} symbol="€" />);
     expect(screen.getByText(/no spending data available for this period/i)).toBeInTheDocument();
   });
+
+  it('can render spending trends without a card background', () => {
+    const { container } = render(
+      <SpendingChart chartData={{ expensive: [], least: [] }} symbol="€" transparent />,
+    );
+
+    expect(container.firstChild).toHaveClass('chart-card-transparent');
+  });
 });

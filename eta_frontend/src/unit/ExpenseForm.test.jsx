@@ -82,6 +82,8 @@ describe('ExpenseForm unit tests', () => {
 
     expect(screen.queryByText(/converted/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /edit/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /recent expenses/i })).toBeInTheDocument();
+    expect(document.querySelector('.expense-table')).toBeInTheDocument();
   });
 
   it('allows changing the subcategory when editing an expense', async () => {
@@ -104,6 +106,27 @@ describe('ExpenseForm unit tests', () => {
     await user.click(screen.getByRole('button', { name: /save changes/i }));
 
     await waitFor(() => expect(client.patch).toHaveBeenCalledWith('/expenses/99/', expect.objectContaining({ subcategory: 11 })));
+  });
+
+  it('groups the expense fields and aligns notes with the save action', () => {
+    render(
+      <ExpenseForm
+        categories={[{ id: 1, name: 'Food' }]}
+        subcategories={[{ id: 10, name: 'Groceries', category: 1 }]}
+        items={items}
+        currencies={[{ id: 1, code: 'EUR', symbol: '€' }]}
+        client={mockClient}
+        onSuccess={vi.fn()}
+        onError={vi.fn()}
+      />,
+    );
+
+    expect(document.querySelectorAll('.expense-form > .expense-row')).toHaveLength(4);
+    expect(document.querySelector('.expense-row-primary').children).toHaveLength(4);
+    expect(document.querySelector('.expense-row-description').children).toHaveLength(2);
+    expect(document.querySelector('.expense-row-amounts').children).toHaveLength(4);
+    expect(document.querySelector('.expense-row-notes-save').children).toHaveLength(2);
+    expect(document.querySelector('.expense-save-button')).toHaveTextContent('Save Expense');
   });
 
   it('shows eleven expenses per page', async () => {

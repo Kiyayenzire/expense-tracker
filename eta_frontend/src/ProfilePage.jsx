@@ -217,9 +217,8 @@ export default function ProfilePage({ token, onLogout, theme, setTheme, onNaviga
   const profileImage = previewUrl || profile.profile_picture_url || profilePicture || '';
 
   return (
-    <div className="container">
-      <main className="page-content">
-        <section className="card profile-page-card">
+    <main className="page-content">
+      <section className="card profile-page-card">
           <div className="page-heading">
             <h2>My Profile</h2>
             <p className="small-text">Update your account details and profile photo.</p>
@@ -233,9 +232,9 @@ export default function ProfilePage({ token, onLogout, theme, setTheme, onNaviga
           ) : (
             <form onSubmit={handleSubmit} className="profile-form">
               <div className="profile-editor-header">
-                <div className="profile-page-picture" style={{ width: '2.1rem', height: '2.1rem', flex: '0 0 2.1rem', overflow: 'hidden', borderRadius: '50%' }}>
+                <div className="profile-page-picture">
                   {profileImage ? (
-                    <img src={profileImage} alt="Profile" style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={profileImage} alt="Profile" />
                   ) : (
                     <div className="profile-avatar large-avatar">{(username || profile.username || 'User').slice(0, 2).toUpperCase()}</div>
                   )}
@@ -382,8 +381,7 @@ export default function ProfilePage({ token, onLogout, theme, setTheme, onNaviga
               </div>
             </section>
           )}
-        </section>
-      </main>
-    </div>
+      </section>
+    </main>
   );
 }

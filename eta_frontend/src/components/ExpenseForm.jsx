@@ -185,14 +185,16 @@ export function ExpenseForm({ categories, subcategories, items, currencies, clie
           </div>
         </div>
 
-        <div className="form-group expense-field expense-field-notes full-width-field">
-          <label>Notes (optional)</label>
-          <textarea className="form-control" placeholder="Add useful details" value={form.notes} onChange={(e) => handleChange('notes', e.target.value)} rows={2} />
-        </div>
+        <div className="expense-row expense-row-notes-save">
+          <div className="form-group expense-field expense-field-notes full-width-field">
+            <label>Notes (optional)</label>
+            <textarea className="form-control" placeholder="Add useful details" value={form.notes} onChange={(e) => handleChange('notes', e.target.value)} rows={2} />
+          </div>
 
-        <button className="primary-action-button w-100" type="submit" disabled={submitting}>
-          {submitting ? 'Saving...' : 'Save Expense'}
-        </button>
+          <button className="primary-action-button expense-save-button" type="submit" disabled={submitting}>
+            {submitting ? 'Saving...' : 'Save Expense'}
+          </button>
+        </div>
       </form>
     </div>
   );

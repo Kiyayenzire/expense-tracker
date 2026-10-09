@@ -89,9 +89,8 @@ export function ReportExporter({ client, displayCurrency, onSuccess, onError }) 
 		<section className="card">
 			<h2>Export Report</h2>
 
-			{/* Filter Type Selection */}
-			<div className="form-row">
-				<label>
+			<div className="report-export-controls">
+				<label className="report-filter-field">
 					Report Type
 					<select className="form-control" value={filterType} onChange={(event) => setFilterType(event.target.value)}>
 						<option value="monthly">Monthly</option>
@@ -100,108 +99,71 @@ export function ReportExporter({ client, displayCurrency, onSuccess, onError }) 
 						<option value="custom_dates">Custom Date Range</option>
 					</select>
 				</label>
-				<label>
+
+				<label className="report-filter-field">
 					Format
 					<select className="form-control" value={format} onChange={(event) => setFormat(event.target.value)}>
 						<option value="csv">CSV</option>
 						<option value="pdf">PDF</option>
 					</select>
 				</label>
-			</div>
 
-			{/* Monthly Filter */}
-			{filterType === 'monthly' && (
-				<div className="form-row">
-					<label>
-						Month
-						<select className="form-control" value={month} onChange={(event) => setMonth(event.target.value)}>
-							{months.map((m) => (
-								<option key={m.value} value={m.value}>
-									{m.label}
-								</option>
-							))}
-						</select>
-					</label>
-					<label>
+				{filterType === 'monthly' && (
+					<>
+						<label className="report-filter-field">
+							Month
+							<select className="form-control" value={month} onChange={(event) => setMonth(event.target.value)}>
+								{months.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+							</select>
+						</label>
+						<label className="report-filter-field">
+							Year
+							<select className="form-control" value={year} onChange={(event) => setYear(event.target.value)}>
+								{years.map((y) => <option key={y} value={y}>{y}</option>)}
+							</select>
+						</label>
+					</>
+				)}
+
+				{filterType === 'yearly' && (
+					<label className="report-filter-field">
 						Year
 						<select className="form-control" value={year} onChange={(event) => setYear(event.target.value)}>
-							{years.map((y) => (
-								<option key={y} value={y}>
-									{y}
-								</option>
-							))}
+							{years.map((y) => <option key={y} value={y}>{y}</option>)}
 						</select>
 					</label>
-				</div>
-			)}
+				)}
 
-			{/* Yearly Filter */}
-			{filterType === 'yearly' && (
-				<div className="form-row">
-					<label>
-						Year
-						<select className="form-control" value={year} onChange={(event) => setYear(event.target.value)}>
-							{years.map((y) => (
-								<option key={y} value={y}>
-									{y}
-								</option>
-							))}
-						</select>
-					</label>
-				</div>
-			)}
+				{filterType === 'year_range' && (
+					<>
+						<label className="report-filter-field">
+							Start Year
+							<select className="form-control" value={startYear} onChange={(event) => setStartYear(event.target.value)}>
+								{years.map((y) => <option key={y} value={y}>{y}</option>)}
+							</select>
+						</label>
+						<label className="report-filter-field">
+							End Year
+							<select className="form-control" value={endYear} onChange={(event) => setEndYear(event.target.value)}>
+								{years.map((y) => <option key={y} value={y}>{y}</option>)}
+							</select>
+						</label>
+					</>
+				)}
 
-			{/* Year Range Filter */}
-			{filterType === 'year_range' && (
-				<div className="form-row">
-					<label>
-						Start Year
-						<select className="form-control" value={startYear} onChange={(event) => setStartYear(event.target.value)}>
-							{years.map((y) => (
-								<option key={y} value={y}>
-									{y}
-								</option>
-							))}
-						</select>
-					</label>
-					<label>
-						End Year
-						<select className="form-control" value={endYear} onChange={(event) => setEndYear(event.target.value)}>
-							{years.map((y) => (
-								<option key={y} value={y}>
-									{y}
-								</option>
-							))}
-						</select>
-					</label>
-				</div>
-			)}
+				{filterType === 'custom_dates' && (
+					<>
+						<label className="report-filter-field">
+							Start Date
+							<input className="form-control" type="date" value={startDate || ''} onChange={(event) => setStartDate(event.target.value)} />
+						</label>
+						<label className="report-filter-field">
+							End Date
+							<input className="form-control" type="date" value={endDate || ''} onChange={(event) => setEndDate(event.target.value)} />
+						</label>
+					</>
+				)}
 
-			{/* Custom Date Range Filter */}
-			{filterType === 'custom_dates' && (
-				<div className="form-row">
-					<label>
-						Start Date
-						<input
-							className="form-control"
-							type="date"
-							value={startDate}
-							onChange={(event) => setStartDate(event.target.value)}
-						/>
-					</label>
-					<label>
-						End Date
-						<input
-							className="form-control"
-							type="date"
-							value={endDate}
-							onChange={(event) => setEndDate(event.target.value)}
-						/>
-					</label>
-				</div>
-			)}
-
-			<div className="report-export-actions">
 				<button type="button" className="report-export-button" onClick={handleExport} disabled={exporting || (filterType === 'custom_dates' && (!startDate || !endDate))}>
 					{exporting ? 'Exporting...' : 'Download Report'}
 				</button>

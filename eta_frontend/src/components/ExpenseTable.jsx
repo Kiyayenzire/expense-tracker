@@ -61,7 +61,7 @@ export function ExpenseTable({ expenses, displayCurrency, categories = [], subca
   };
 
   return (
-    <div className="card">
+    <div className="card expense-table-card">
       <div className="header">
         <div>
           <h2>Recent Expenses</h2>
@@ -69,7 +69,7 @@ export function ExpenseTable({ expenses, displayCurrency, categories = [], subca
         </div>
       </div>
       <div className="table-responsive">
-        <table className="table table-striped">
+        <table className="table table-striped expense-table">
           <thead>
             <tr>
               <th>Date</th>

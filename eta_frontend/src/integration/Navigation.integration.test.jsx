@@ -22,9 +22,20 @@ describe('Frontend navigation integration tests', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole('button', { name: /open summary navigation/i }));
+    const appShell = document.querySelector('.app-shell');
+    const toggle = screen.getByRole('button', { name: /open summary navigation/i });
+    expect(appShell).not.toHaveClass('summary-drawer-open');
+    expect(appShell).toHaveClass('dashboard-shell');
+
+    await user.click(toggle);
+    expect(appShell).toHaveClass('summary-drawer-open');
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
     await user.click(screen.getByRole('button', { name: /monthly/i }));
 
     expect(screen.getByText(/monthly summary/i)).toBeInTheDocument();
+    expect(document.querySelector('.app-shell')).toBe(appShell);
+    expect(document.querySelectorAll('.app-shell')).toHaveLength(1);
+    expect(appShell).not.toHaveClass('summary-drawer-open');
+    expect(appShell).not.toHaveClass('dashboard-shell');
   });
 });

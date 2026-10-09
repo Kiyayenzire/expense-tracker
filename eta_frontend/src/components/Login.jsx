@@ -567,14 +567,24 @@ function Login({ onLogin, onNavigate }) {
               )}
               <div className="social-auth-actions">
                 <p>Or continue with</p>
-                <div className="auth-inline-row">
-                  <button type="button" className="auth-action-button" onClick={() => handleSocialLogin('google')}>
+                <div className="social-auth-row">
+                  <button
+                    type="button"
+                    className="auth-action-button social-auth-button"
+                    aria-label="Continue with Google"
+                    title="Continue with Google"
+                    onClick={() => handleSocialLogin('google')}
+                  >
                     <i className="fa-brands fa-google" aria-hidden="true" />
-                    <span>Google</span>
                   </button>
-                  <button type="button" className="auth-action-button" onClick={() => handleSocialLogin('apple')}>
+                  <button
+                    type="button"
+                    className="auth-action-button social-auth-button"
+                    aria-label="Continue with Apple"
+                    title="Continue with Apple"
+                    onClick={() => handleSocialLogin('apple')}
+                  >
                     <i className="fa-brands fa-apple" aria-hidden="true" />
-                    <span>Apple</span>
                   </button>
                 </div>
                 {(!authOptions.providers?.google?.configured || !authOptions.providers?.apple?.configured) && (

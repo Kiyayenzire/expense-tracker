@@ -41,6 +41,8 @@ describe('Reports and insights unit tests', () => {
     expect(screen.getByRole('heading', { name: /financial insights/i })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /spending prediction/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /budget recommendations/i })).not.toBeInTheDocument();
+    expect(document.querySelectorAll('.insight-feature.card')).toHaveLength(0);
+    expect(document.querySelector('.insights-feature-grid')).toBeInTheDocument();
   });
 
   it('submits the export payload with the current report settings', async () => {
@@ -63,6 +65,7 @@ describe('Reports and insights unit tests', () => {
       />
     );
 
+    expect(document.querySelector('.report-export-controls').children).toHaveLength(5);
     fireEvent.click(screen.getByRole('button', { name: /download report/i }));
 
     await waitFor(() => {

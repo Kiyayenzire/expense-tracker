@@ -1,13 +1,14 @@
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
-export function SpendingChart({ chartData = {}, symbol = '€' }) {
+export function SpendingChart({ chartData = {}, symbol = '€', transparent = false }) {
   const expensive = Array.isArray(chartData.expensive) ? chartData.expensive : [];
   const least = Array.isArray(chartData.least) ? chartData.least : [];
+  const chartClassName = transparent ? 'card chart-card chart-card-transparent' : 'card chart-card';
 
   if (!expensive.length && !least.length) {
     return (
-      <div className="card chart-card">
+      <div className={chartClassName}>
         <h2>Spending Trends</h2>
         <div className="empty-state">No spending data available for this period.</div>
       </div>
@@ -20,7 +21,7 @@ export function SpendingChart({ chartData = {}, symbol = '€' }) {
   }));
 
   return (
-    <div className="card chart-card">
+    <div className={chartClassName}>
       <h2>Spending Trends</h2>
       <div className="chart-wrapper">
         <ResponsiveContainer width="100%" height={320}>

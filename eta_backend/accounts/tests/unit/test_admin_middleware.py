@@ -116,7 +116,7 @@ class TestSuperuserAdminMiddleware:
         assert response.status_code == 302
         assert response.url.startswith(reverse('admin:login'))
 
-    def test_non_superuser_is_forbidden(self):
+    def test_non_superuser_gets_generic_not_found_on_admin_path(self):
         user = User.objects.create_user(
             username='regular-user',
             email='regular@example.com',
@@ -127,7 +127,21 @@ class TestSuperuserAdminMiddleware:
 
         response = middleware(request)
 
-        assert response.status_code == 403
+        assert response.status_code == 404
+        assert b'Only superusers' not in response.content
+
+    def test_authenticated_non_superuser_gets_not_found_on_admin_login_path(self):
+        user = User.objects.create_user(
+            username='regular-login-user',
+            email='regular-login@example.com',
+            password='StrongPassword1!',
+        )
+        request = self.make_request('GET', reverse('admin:login'), user)
+        middleware = SuperuserAdminMiddleware(lambda request: HttpResponse(status=200))
+
+        response = middleware(request)
+
+        assert response.status_code == 404
 
     def test_unverified_superuser_gets_a_clean_admin_login_form(self):
         superuser = self.create_superuser('reauth-admin')
@@ -147,7 +161,7 @@ class TestSuperuserAdminMiddleware:
         assert not request.user.is_authenticated
         assert request.session['_auth_user_backend'] == 'allauth.account.auth_backends.AuthenticationBackend'
 
-    def test_non_staff_session_is_preserved_on_admin_login_page(self):
+    def test_non_staff_session_cannot_open_admin_login_page(self):
         user = User.objects.create_user(
             username='app-user',
             email='app-user@example.com',
@@ -159,13 +173,11 @@ class TestSuperuserAdminMiddleware:
             user,
             backend='allauth.account.auth_backends.AuthenticationBackend',
         )
-        middleware = SuperuserAdminMiddleware(
-            lambda request: HttpResponse(status=200 if request.user.is_authenticated else 500)
-        )
+        middleware = SuperuserAdminMiddleware(lambda request: HttpResponse(status=200))
 
         response = middleware(request)
 
-        assert response.status_code == 200
+        assert response.status_code == 404
         assert request.user.is_authenticated
 
     def test_admin_session_expires_after_eleven_minutes_of_inactivity(self, monkeypatch):

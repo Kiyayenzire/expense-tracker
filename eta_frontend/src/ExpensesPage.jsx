@@ -29,7 +29,7 @@ export default function ExpensesPage({ token, onLogout, onNavigate, displayCurre
         <section className="card expense-filters page-section">
           <h2>Filter Expenses</h2>
 
-          <div className="filter-search-row">
+          <div className="filter-grid">
             <div className="filter-field filter-search-field">
               <label htmlFor="expense-search">Search Term:</label>
               <input
@@ -41,9 +41,6 @@ export default function ExpensesPage({ token, onLogout, onNavigate, displayCurre
                 onChange={(event) => setFilters((current) => ({ ...current, description: event.target.value }))}
               />
             </div>
-          </div>
-
-          <div className="filter-grid">
             <div className="filter-field">
               <label htmlFor="expense-date">Date:</label>
               <input
@@ -128,7 +125,7 @@ export default function ExpensesPage({ token, onLogout, onNavigate, displayCurre
           />
         </div>
         <div className="page-section">
-          <SpendingChart chartData={dashboard.chart} symbol={symbol} />
+          <SpendingChart chartData={dashboard.chart} symbol={symbol} transparent />
         </div>
     </div>
   );

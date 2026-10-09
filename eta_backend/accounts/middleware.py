@@ -4,7 +4,7 @@ from django.conf import settings
 from django.contrib.auth import logout
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.auth.views import redirect_to_login
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseNotFound
 from django.urls import reverse
 
 
@@ -23,6 +23,9 @@ class SuperuserAdminMiddleware:
         admin_path = f"/{settings.DJANGO_ADMIN_URL.strip('/')}/"
         if request.path != admin_path and not request.path.startswith(admin_path):
             return self.get_response(request)
+
+        if request.user.is_authenticated and not request.user.is_superuser:
+            return HttpResponseNotFound()
 
         admin_login_path = f'{admin_path}login/'
         if request.path == admin_login_path and request.method == 'GET':
@@ -54,8 +57,6 @@ class SuperuserAdminMiddleware:
 
         user = request.user
         if user.is_authenticated:
-            if not user.is_superuser:
-                return HttpResponseForbidden('Only superusers can access the admin site.')
             if not self._has_admin_password_session(request):
                 return redirect_to_login(request.get_full_path(), login_url=reverse('admin:login'))
             if self._is_admin_session_expired(request):

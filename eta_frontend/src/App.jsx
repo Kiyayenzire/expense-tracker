@@ -18,9 +18,18 @@ import { AppShell } from './components/AppShell';
 // ---------------------------------------------------------------------------
 const STORAGE_KEY = 'expense-tracker-token';
 const THEME_KEY = 'expense-tracker-theme';
+const SUPPORTED_THEMES = ['light', 'dark', 'gold'];
 const USERNAME_KEY = 'expense-tracker-username';
 const PROFILE_PICTURE_KEY = 'expense-tracker-profile-picture';
 const getPageFromHash = () => window.location.hash.replace('#/', '') || 'dashboard';
+const getStoredTheme = () => {
+  const storedTheme = localStorage.getItem(THEME_KEY);
+  if (!SUPPORTED_THEMES.includes(storedTheme)) {
+    localStorage.removeItem(THEME_KEY);
+    return 'light';
+  }
+  return storedTheme;
+};
 
 function App() {
   // ---------------------------------------------------------------------------
@@ -30,7 +39,7 @@ function App() {
   const [username, setUsername] = useState(localStorage.getItem(USERNAME_KEY) || 'User');
   const [profilePicture, setProfilePicture] = useState(localStorage.getItem(PROFILE_PICTURE_KEY) || '');
   const [currentUser, setCurrentUser] = useState(null);
-  const [theme, setTheme] = useState(() => localStorage.getItem(THEME_KEY) || 'light');
+  const [theme, setTheme] = useState(getStoredTheme);
   const [displayCurrency, setDisplayCurrency] = useState('EUR');
   const [page, setPage] = useState(getPageFromHash);
   const [deleteFlow, setDeleteFlow] = useState({ isOpen: false, password: '', error: '' });
@@ -197,24 +206,8 @@ function App() {
     setPage(nextPage);
   }
 
-  if (page === 'support') {
-    return token ? (
-      <AppShell
-        token={token}
-        onLogout={handleLogout}
-        theme={theme}
-        setTheme={setTheme}
-        onNavigate={navigate}
-        username={username}
-        profilePicture={profilePicture}
-        displayCurrency={displayCurrency}
-        setDisplayCurrency={setDisplayCurrency}
-      >
-        <HelpSupport currentUser={currentUser} onNavigate={navigate} />
-      </AppShell>
-    ) : (
-      <HelpSupport onNavigate={navigate} />
-    );
+  if (page === 'support' && !token) {
+    return <HelpSupport onNavigate={navigate} />;
   }
 
   // Active page router selection
@@ -277,7 +270,7 @@ function App() {
       ) : ['daily', 'weekly', 'monthly', 'quarterly', 'annual'].includes(page) ? (
         <PeriodSummaryPage period={page} token={token} onLogout={handleLogout} displayCurrency={displayCurrency} />
       ) : (
-        <Dashboard token={token} onLogout={handleLogout} theme={theme} setTheme={setTheme} onNavigate={navigate} onDeleteAccount={openDeleteAccountFlow} username={username} profilePicture={profilePicture} displayCurrency={displayCurrency} setDisplayCurrency={setDisplayCurrency} />
+        null
       )}
     </>
   );
@@ -286,23 +279,33 @@ function App() {
   // 4. MAIN APPLICATION VIEW
   // ---------------------------------------------------------------------------
   return token ? (
-    page === 'dashboard' ? (
-      dashboardView
-    ) : (
       <AppShell
         token={token}
         onLogout={handleLogout}
         theme={theme}
         setTheme={setTheme}
         onNavigate={navigate}
+        onDeleteAccount={openDeleteAccountFlow}
+        activePage={page}
         username={username}
         profilePicture={profilePicture}
         displayCurrency={displayCurrency}
         setDisplayCurrency={setDisplayCurrency}
       >
-        {dashboardView}
+        {({ dashboard, queuedCount, isSyncing }) => (
+          <>
+            {dashboardView}
+            {page === 'dashboard' && (
+              <Dashboard
+                dashboard={dashboard}
+                queuedCount={queuedCount}
+                isSyncing={isSyncing}
+                symbol={dashboard.currencies.find((currency) => currency.code === displayCurrency)?.symbol || '€'}
+              />
+            )}
+          </>
+        )}
       </AppShell>
-    )
   ) : (
     <Login onLogin={handleLogin} onNavigate={navigate} />
   );
