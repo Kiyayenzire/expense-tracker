@@ -126,11 +126,22 @@ def register_user(request):
 @permission_classes([AllowAny])
 def resend_registration_verification(request):
     email = str(request.data.get('email') or '').strip()
-    if not email:
+    if request.user.is_authenticated:
+        user = request.user
+    elif email:
+        user = User.objects.filter(email__iexact=email, is_active=False).first()
+    else:
         return Response({'email': ['Enter the email address used to register.']}, status=status.HTTP_400_BAD_REQUEST)
 
-    address = EmailAddress.objects.select_related('user').filter(email__iexact=email).first()
-    if address and not address.verified and not address.user.is_active:
+    address = None
+    if user and user.email:
+        address, _ = EmailAddress.objects.get_or_create(
+            user=user,
+            email=user.email,
+            defaults={'primary': True, 'verified': False},
+        )
+
+    if address and not address.verified:
         try:
             send_registration_verification_email.delay(address.pk)
         except Exception:
@@ -182,13 +193,12 @@ def custom_login(request):
             'detail': 'Incorrect password. Please try again or use the forgot password link.'
         }, status=status.HTTP_400_BAD_REQUEST)
 
-    email_address = EmailAddress.objects.filter(user=user, email__iexact=user.email).first()
-    if email_address and not email_address.verified:
-        return Response({
-            'detail': 'Please verify your email address before signing in. Check your inbox or resend the verification email.'
-        }, status=status.HTTP_403_FORBIDDEN)
-
     if not user.is_active:
+        email_address = EmailAddress.objects.filter(user=user, email__iexact=user.email).first()
+        if email_address and not email_address.verified:
+            return Response({
+                'detail': 'Please verify your email address before signing in. Check your inbox or resend the verification email.'
+            }, status=status.HTTP_403_FORBIDDEN)
         return Response({'detail': 'This account is inactive. Contact support if you need help.'}, status=status.HTTP_403_FORBIDDEN)
 
     auth_user = authenticate(request, username=user.username, password=password)

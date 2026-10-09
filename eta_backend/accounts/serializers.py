@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from allauth.account.models import EmailAddress
 from dj_rest_auth.registration.serializers import RegisterSerializer
 from allauth.socialaccount.models import SocialAccount
 
@@ -18,6 +19,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     profile_picture_url = serializers.SerializerMethodField()
     has_usable_password = serializers.SerializerMethodField()
     social_providers = serializers.SerializerMethodField()
+    email_verified = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -34,6 +36,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'profile_picture_url',
             'has_usable_password',
             'social_providers',
+            'email_verified',
         ]
         read_only_fields = [
             'id', 'username', 'email', 'role',
@@ -42,6 +45,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def get_has_usable_password(self, obj):
         return obj.has_usable_password()
+
+    def get_email_verified(self, obj):
+        return EmailAddress.objects.filter(
+            user=obj,
+            email__iexact=obj.email,
+            verified=True,
+        ).exists()
 
     def get_social_providers(self, obj):
         return sorted(

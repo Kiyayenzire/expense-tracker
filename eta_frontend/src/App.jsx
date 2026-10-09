@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 // View & Component Imports
 import Login from './components/Login';
@@ -39,6 +39,8 @@ function App() {
   const [username, setUsername] = useState(localStorage.getItem(USERNAME_KEY) || 'User');
   const [profilePicture, setProfilePicture] = useState(localStorage.getItem(PROFILE_PICTURE_KEY) || '');
   const [currentUser, setCurrentUser] = useState(null);
+  const [verificationNotice, setVerificationNotice] = useState('');
+  const emailVerifiedRef = useRef(false);
   const [theme, setTheme] = useState(getStoredTheme);
   const [displayCurrency, setDisplayCurrency] = useState('EUR');
   const [page, setPage] = useState(getPageFromHash);
@@ -83,6 +85,44 @@ function App() {
       });
   }, []);
 
+  useEffect(() => {
+    if (!token) return undefined;
+    const verificationMatch = window.location.hash.match(/\/verify-email\/([^/?#]+)/);
+    if (!verificationMatch) return undefined;
+
+    let isCurrent = true;
+    window.history.replaceState({}, '', `${window.location.pathname}${window.location.search}#/`);
+    setPage('dashboard');
+    setVerificationNotice('');
+    let key;
+    try {
+      key = decodeURIComponent(verificationMatch[1]);
+    } catch {
+      setVerificationNotice('This verification link is invalid. Request a new verification email and try again.');
+      return undefined;
+    }
+
+    fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/auth/registration/verify-email/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    })
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.detail || 'Unable to verify your email address.');
+        if (isCurrent) {
+          emailVerifiedRef.current = true;
+          setCurrentUser((user) => user ? { ...user, email_verified: true } : user);
+          setVerificationNotice(data.detail || 'Email verified successfully.');
+        }
+      })
+      .catch((error) => {
+        if (isCurrent) setVerificationNotice(error.message || 'Unable to verify your email address.');
+      });
+
+    return () => { isCurrent = false; };
+  }, [token]);
+
   // Effect: Apply theme attribute to html/body elements & update local storage
   useEffect(() => {
     const nextTheme = token ? theme : 'light';
@@ -105,7 +145,11 @@ function App() {
         return response.json();
       })
       .then((data) => {
-        setCurrentUser({ id: data.id, email: data.email });
+        setCurrentUser({
+          id: data.id,
+          email: data.email,
+          email_verified: data.email_verified || emailVerifiedRef.current,
+        });
         const nextUsername = data.username || localStorage.getItem(USERNAME_KEY) || username || 'User';
         const nextPicture = data.profile_picture_url || data.profile_picture || localStorage.getItem(PROFILE_PICTURE_KEY) || '';
         const safeUsername = String(nextUsername || 'User').trim();
@@ -144,7 +188,12 @@ function App() {
     setUsername(safeUsername);
     setProfilePicture(safeProfilePicture);
     if (loggedInUser) {
-      setCurrentUser({ id: loggedInUser.id, email: loggedInUser.email });
+      emailVerifiedRef.current = loggedInUser.email_verified === true;
+      setCurrentUser({
+        id: loggedInUser.id,
+        email: loggedInUser.email,
+        email_verified: loggedInUser.email_verified,
+      });
     }
   }
 
@@ -157,6 +206,7 @@ function App() {
     setUsername('User');
     setProfilePicture('');
     setCurrentUser(null);
+    emailVerifiedRef.current = false;
     setDeleteFlow({ isOpen: false, password: '', error: '' });
   }
 
@@ -289,6 +339,8 @@ function App() {
         activePage={page}
         username={username}
         profilePicture={profilePicture}
+        currentUser={currentUser}
+        verificationNotice={verificationNotice}
         displayCurrency={displayCurrency}
         setDisplayCurrency={setDisplayCurrency}
       >

@@ -26,7 +26,7 @@ def send_registration_verification_email(self, email_address_id):
             subject='Verify your Expense Tracker account',
             message=(
                 f"Hello {email_address.user.username},\n\n"
-                'Please verify your email address to activate your account. '
+                'Please verify the email address associated with your account. '
                 'This link expires in 24 hours:\n\n'
                 f'{verification_url}\n\n'
                 'If you did not create this account, you can ignore this message.'

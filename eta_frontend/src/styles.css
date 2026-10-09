@@ -730,6 +730,37 @@ body[data-theme="gold"] textarea::placeholder {
   margin-bottom: 1rem;
 }
 
+.email-verification-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.email-verification-banner p {
+  margin: 0.25rem 0 0;
+}
+
+.verification-feedback {
+  font-size: 0.9rem;
+}
+
+.verification-result {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+@media (max-width: 600px) {
+  .email-verification-banner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 .header-topline {
   display: flex;
   align-items: center;

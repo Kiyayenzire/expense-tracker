@@ -13,6 +13,7 @@ from django.contrib.sites.models import Site
 from django.test import override_settings
 import pytest
 from rest_framework import status
+from rest_framework.test import APIClient
 
 User = get_user_model()
 
@@ -138,6 +139,50 @@ class TestAccountsLoginAPIContract:
             format='json',
         )
         assert login_response.status_code == status.HTTP_200_OK
+        assert login_response.json()['user']['email_verified'] is True
+
+    def test_existing_active_account_can_login_with_unverified_email(self, api_client, test_user):
+        EmailAddress.objects.create(
+            user=test_user,
+            email=test_user.email,
+            primary=True,
+            verified=False,
+        )
+
+        response = api_client.post(
+            '/api/auth/login/',
+            {'username': test_user.username, 'password': 'testpass123'},
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()['user']['email_verified'] is False
+
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+        FRONTEND_URL='http://localhost:5174',
+    )
+    def test_active_unverified_account_can_resend_verification(self, authenticated_client, test_user):
+        anonymous_client = APIClient()
+        with patch('accounts.views.send_registration_verification_email.delay') as public_queue:
+            public_response = anonymous_client.post(
+                '/api/auth/registration/resend-email/',
+                {'email': test_user.email},
+                format='json',
+            )
+        assert public_response.status_code == status.HTTP_200_OK
+        public_queue.assert_not_called()
+        assert not EmailAddress.objects.filter(user=test_user).exists()
+
+        with patch('accounts.views.send_registration_verification_email.delay') as queued_email:
+            response = authenticated_client.post(
+                '/api/auth/registration/resend-email/',
+                format='json',
+            )
+
+        address = EmailAddress.objects.get(user=test_user)
+        assert response.status_code == status.HTTP_200_OK
+        assert address.verified is False
+        queued_email.assert_called_once_with(address.pk)
 
     def test_registration_rejects_invalid_email_address(self, api_client):
         response = api_client.post(
@@ -211,6 +256,7 @@ class TestAccountsProfileAPIContract:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data['username'] == 'testuser'
+        assert data['email_verified'] is False
 
     def test_profile_patch_updates_fields(self, authenticated_client, test_user):
         payload = {'first_name': 'Jane', 'last_name': 'Doe', 'phone_number': '0700000000'}
