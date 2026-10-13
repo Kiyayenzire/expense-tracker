@@ -274,7 +274,7 @@ export default function ProfilePage({ token, onLogout, theme, setTheme, onNaviga
   const profileImage = previewUrl || profile.profile_picture_url || profilePicture || '';
 
   return (
-    <main className="page-content">
+    <main className="page-content profile-page">
       <section className="card profile-page-card">
           <div className="page-heading">
             <h2>My Profile</h2>

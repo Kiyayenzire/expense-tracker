@@ -51,7 +51,18 @@ export function Header({
   return (
     <header className="header app-header">
       <div className="header-topline">
-        <h1>Expense Tracker</h1>
+        <h1>
+          <a
+            className="app-brand-link"
+            href="#dashboard"
+            onClick={(event) => {
+              event.preventDefault();
+              onNavigate('dashboard');
+            }}
+          >
+            Expense Tracker
+          </a>
+        </h1>
         <p className="small-text">
           Today is {new Intl.DateTimeFormat('en-GB').format(new Date())}
         </p>

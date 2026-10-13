@@ -874,6 +874,26 @@ body[data-theme="gold"] .header-action-button:hover {
   min-width: 0;
 }
 
+.app-brand-link {
+  color: inherit;
+  text-decoration: none;
+  text-decoration-color: transparent;
+  text-underline-offset: 0.2em;
+  transition: color 140ms ease, text-decoration-color 140ms ease;
+}
+
+.app-brand-link:hover {
+  color: var(--primary);
+  text-decoration: underline;
+  text-decoration-color: currentColor;
+}
+
+.app-brand-link:focus-visible {
+  border-radius: 0.2rem;
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
 .help-support-page {
   width: 100%;
   max-width: none;
@@ -1262,7 +1282,195 @@ header h2 {
   object-position: center;
 }
 
+.profile-page {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding-bottom: 2rem;
+}
+
+.profile-page-card {
+  overflow: hidden;
+  padding: clamp(1.25rem, 3vw, 2.25rem);
+  border-radius: calc(var(--radius) + 0.35rem);
+  box-shadow: 0 18px 44px var(--shadow-soft);
+}
+
+.profile-page-card > .page-heading {
+  margin: 0 0 1.5rem;
+  padding-bottom: 1.15rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.profile-page-card > .page-heading h2 {
+  margin: 0 0 0.35rem;
+  font-size: clamp(1.5rem, 3vw, 1.9rem);
+  letter-spacing: -0.035em;
+}
+
+.profile-page-card > .page-heading p {
+  margin: 0;
+}
+
+.profile-editor-header {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: linear-gradient(135deg, var(--surface) 0%, var(--background) 100%);
+}
+
+.profile-page-picture {
+  width: 5rem;
+  height: 5rem;
+  flex-basis: 5rem;
+  border: 3px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--border), 0 6px 16px var(--shadow-soft);
+}
+
+.profile-upload-block {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 0.35rem;
+}
+
+.profile-upload-block .form-label {
+  margin: 0;
+  font-weight: 700;
+}
+
+.profile-upload-block .form-control {
+  min-width: 0;
+  color: var(--text);
+}
+
+.profile-form .form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.profile-form .form-group {
+  min-width: 0;
+  margin-bottom: 1rem;
+}
+
+.profile-form .form-group label {
+  display: block;
+  margin-bottom: 0.45rem;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.profile-form .form-control {
+  min-height: 2.9rem;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: var(--background);
+  color: var(--text);
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.profile-form .form-control:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--card-glow);
+}
+
+.profile-form .form-group small {
+  display: block;
+  margin-top: 0.4rem;
+  line-height: 1.45;
+}
+
+.profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.profile-actions button {
+  min-height: 2.9rem;
+  padding: 0.7rem 1.15rem;
+  border-radius: 0.8rem;
+}
+
+.profile-actions .danger-action-button {
+  margin-left: 0.25rem;
+}
+
+.profile-security {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.profile-security h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1.2rem;
+}
+
+.profile-social-methods {
+  margin-top: 1.5rem;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--background);
+}
+
+.profile-social-methods h4 {
+  margin: 0 0 0.65rem;
+  font-size: 1rem;
+}
+
+.profile-social-methods > .small-text {
+  margin: 0;
+}
+
 @media (max-width: 540px) {
+  .profile-page-card {
+    padding: 1.1rem;
+  }
+
+  .profile-editor-header {
+    align-items: flex-start;
+    gap: 0.9rem;
+    padding: 0.9rem;
+  }
+
+  .profile-page-picture {
+    width: 4rem;
+    height: 4rem;
+    flex-basis: 4rem;
+  }
+
+  .profile-form .form-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .profile-actions {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .profile-actions .danger-action-button {
+    margin-left: 0;
+  }
+
+  .profile-actions button {
+    width: 100%;
+  }
+
   .theme-selector {
     gap: 0.2rem;
   }

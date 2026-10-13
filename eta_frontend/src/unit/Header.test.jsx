@@ -3,6 +3,28 @@ import userEvent from '@testing-library/user-event';
 import { Header } from '../components/Header';
 
 describe('Header', () => {
+  it('links the app heading to the dashboard', async () => {
+    const user = userEvent.setup();
+    const onNavigate = vi.fn();
+
+    render(
+      <Header
+        activePage="expenses"
+        onNavigate={onNavigate}
+        onLogout={vi.fn()}
+        theme="light"
+        setTheme={vi.fn()}
+      />,
+    );
+
+    const brandLink = screen.getByRole('link', { name: 'Expense Tracker' });
+    expect(brandLink.closest('h1')).toBeInTheDocument();
+
+    await user.click(brandLink);
+
+    expect(onNavigate).toHaveBeenCalledWith('dashboard');
+  });
+
   it('shows only the three supported themes as buttons', async () => {
     const user = userEvent.setup();
     const setTheme = vi.fn();
