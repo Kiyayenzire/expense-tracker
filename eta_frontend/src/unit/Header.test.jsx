@@ -19,7 +19,7 @@ describe('Header', () => {
 
     const brandLink = screen.getByRole('link', { name: 'Expense Tracker' });
     expect(brandLink.closest('h1')).toBeInTheDocument();
-    expect(brandLink.querySelector('img')).toHaveAttribute('src', '/eta-logo-metallic.png');
+    expect(brandLink.querySelector('img')).toHaveAttribute('src', '/eta-header-logo.png');
     expect(brandLink.querySelector('img')).toHaveAttribute('alt', 'Expense Tracker');
 
     await user.click(brandLink);

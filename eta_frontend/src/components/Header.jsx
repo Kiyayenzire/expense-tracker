@@ -60,7 +60,7 @@ export function Header({
               onNavigate('dashboard');
             }}
           >
-            <img className="app-brand-logo" src="/eta-logo-metallic.png" alt="Expense Tracker" />
+            <img className="app-brand-logo" src="/eta-header-logo.png" alt="Expense Tracker" />
           </a>
         </h1>
         <p className="small-text">
