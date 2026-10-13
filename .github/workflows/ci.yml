@@ -132,10 +132,19 @@ jobs:
           script: |
             set -eu
             cd /home/deploy/expense-tracker
+            docker_config="$(mktemp -d /tmp/eta-docker-config.XXXXXX)"
+            override_file=""
+            cleanup() {
+              if [ -n "$override_file" ]; then
+                rm -f "$override_file"
+              fi
+              rm -rf "$docker_config"
+            }
+            trap cleanup EXIT
+            export DOCKER_CONFIG="$docker_config"
             printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$REGISTRY_USERNAME" --password-stdin
             image_owner="$(printf '%s' "$IMAGE_OWNER" | tr '[:upper:]' '[:lower:]')"
             override_file="$(mktemp /tmp/eta-compose-override.XXXXXX.yaml)"
-            trap 'rm -f "$override_file"' EXIT
             cat > "$override_file" <<EOF
             services:
               migration:
