@@ -38,13 +38,12 @@ logger = logging.getLogger(__name__)
 def auth_options(request):
     social_adapter = get_social_adapter(request)
     providers = {}
-    for provider in ('google', 'apple'):
-        apps = social_adapter.list_apps(request, provider=provider)
-        configured = any(app.client_id and app.secret for app in apps)
-        providers[provider] = {
-            'configured': configured,
-            'url': request.build_absolute_uri(f'/accounts/{provider}/login/') if configured else '',
-        }
+    apps = social_adapter.list_apps(request, provider='google')
+    configured = any(app.client_id and app.secret for app in apps)
+    providers['google'] = {
+        'configured': configured,
+        'url': request.build_absolute_uri('/accounts/google/login/') if configured else '',
+    }
 
     return Response({
         'providers': providers,

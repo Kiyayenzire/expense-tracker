@@ -32,7 +32,7 @@ function Login({ onLogin, onNavigate }) {
   const [verificationStatus, setVerificationStatus] = useState('idle');
   const [resendingVerification, setResendingVerification] = useState(false);
   const [authOptions, setAuthOptions] = useState({
-    providers: { google: { configured: false, url: '' }, apple: { configured: false, url: '' } },
+    providers: { google: { configured: false, url: '' } },
     support: { email: '', phone: '' },
   });
   const [authOptionsStatus, setAuthOptionsStatus] = useState('loading');
@@ -182,7 +182,7 @@ function Login({ onLogin, onNavigate }) {
 
     const providerConfig = authOptions.providers?.[provider];
     if (!providerConfig?.configured || !providerConfig.url) {
-      setGeneralError(`${provider === 'google' ? 'Google' : 'Apple'} sign-in is not configured yet. Contact support for help.`);
+      setGeneralError('Google sign-in is not configured yet. Contact support for help.');
       return;
     }
     window.location.assign(providerConfig.url);
@@ -577,19 +577,10 @@ function Login({ onLogin, onNavigate }) {
                   >
                     <i className="fa-brands fa-google" aria-hidden="true" />
                   </button>
-                  <button
-                    type="button"
-                    className="auth-action-button social-auth-button"
-                    aria-label="Continue with Apple"
-                    title="Continue with Apple"
-                    onClick={() => handleSocialLogin('apple')}
-                  >
-                    <i className="fa-brands fa-apple" aria-hidden="true" />
-                  </button>
                 </div>
-                {(!authOptions.providers?.google?.configured || !authOptions.providers?.apple?.configured) && (
+                {!authOptions.providers?.google?.configured && (
                   authOptionsStatus === 'ready' && (
-                    <small>Google and Apple authentication require provider credentials to be configured.</small>
+                    <small>Google authentication requires provider credentials to be configured.</small>
                   )
                 )}
                 {authOptionsStatus === 'error' && (

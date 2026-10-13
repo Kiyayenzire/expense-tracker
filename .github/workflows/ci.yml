@@ -186,7 +186,7 @@ jobs:
           auth_options="$(curl --fail --silent --show-error "$BASE_URL/api/auth/options/")"
           printf '%s' "$auth_options" | jq -e '
             (.providers.google.configured | type == "boolean") and
-            (.providers.apple.configured | type == "boolean")
+            (.providers | has("apple") | not)
           ' >/dev/null
 
           echo "--> Step 3/3: Verifying Custom Admin Route (/etaalthech2026/)"

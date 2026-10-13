@@ -403,7 +403,7 @@ export default function ProfilePage({ token, onLogout, theme, setTheme, onNaviga
               <div className="profile-social-methods">
                 <h4>Connected providers</h4>
                 {socialProviders.length === 0 ? (
-                  <p className="small-text">No Google or Apple accounts are connected.</p>
+                  <p className="small-text">No social sign-in accounts are connected.</p>
                 ) : socialProviders.map((provider) => (
                   <div className="profile-social-method" key={provider}>
                     <span>{provider === 'google' ? 'Google' : provider === 'apple' ? 'Apple' : provider}</span>

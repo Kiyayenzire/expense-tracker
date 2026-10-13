@@ -68,7 +68,7 @@ docker compose --env-file .env.dev exec backend python manage.py createsuperuser
 http://127.0.0.1:8002/etaalthech2026/
 ```
 
-Django Admin is restricted to superusers. Each Admin session must be established through the Admin login form with a username and password; an app password session or Google/Apple sign-in session alone does not grant Admin access.
+Django Admin is restricted to superusers. Each Admin session must be established through the Admin login form with a username and password; an app password session or Google sign-in session alone does not grant Admin access.
 Admin sessions expire after 11 minutes without mouse, keyboard, touch, scroll, or Admin request activity. This timeout applies only to Django Admin; regular application sessions are unchanged.
 
 ## Environment configuration
@@ -94,24 +94,21 @@ Password registrations remain inactive until the user opens the verification lin
 
 Existing non-staff accounts with an unverified email, and existing users who request an email change, have 31 days to verify an address. Email changes remain pending until verified; the current sign-in email stays in place in the meantime. Accounts still unverified at the deadline are deactivated and can only be restored by support. Deactivated accounts are permanently deleted after a further 97 days. Staff and superuser accounts are excluded. The daily `process_email_change_lifecycle` Celery Beat task enforces these deadlines, so keep Celery Beat running in production.
 
-Google and Apple sign-in are optional and must be configured separately in each environment's database. Password-based registration and sign-in do not depend on these providers.
+Google sign-in is optional and uses `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` from each environment's configuration. Apple sign-in is not enabled. Password-based registration and sign-in do not depend on Google.
 
-When the login screen loads, it requests `GET /api/auth/options/`. A provider is reported as configured when a Django Social Application for that provider is associated with the Site whose ID is `SITE_ID` (default `1`). This check confirms the database record and Site association only; it does not test the credentials or the provider's OAuth callback. If the request itself fails, the login screen reports that availability could not be checked instead of claiming the provider is unconfigured.
+When the login screen loads, it requests `GET /api/auth/options/`. Google is reported as configured when its client ID and secret are available to Django. This readiness check does not test the credentials or OAuth callback. If the request itself fails, the login screen reports that availability could not be checked instead of claiming the provider is unconfigured.
 
-To enable a provider in local development, staging, or production:
+To enable Google sign-in in local development, staging, or production:
 
-1. Create OAuth credentials in the provider's developer console and register the callback URL for that environment. Use the matching URLs below:
+1. Create OAuth credentials in Google's developer console and register the callback URL for that environment:
 
 ```text
 http://localhost:8002/accounts/google/login/callback/
-http://localhost:8002/accounts/apple/login/callback/
 https://eta.althech.com/accounts/google/login/callback/
-https://eta.althech.com/accounts/apple/login/callback/
 ```
 
-2. Open that environment's Django Admin and go to **Social Accounts > Social Applications**. Add a Google or Apple application with the credentials from the provider. Do not commit OAuth secrets to the repository.
-3. In the application's **Sites** field, select the Site record with ID matching `SITE_ID` for that environment, then save. Each environment has its own database and must be configured independently. The Site domain should match the environment's public host.
-4. Check `GET /api/auth/options/` for that environment. The selected provider should have `"configured": true`. Then complete a real sign-in to verify the credentials and callback with the provider.
+2. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in that environment's secure configuration. Do not commit OAuth secrets to the repository.
+3. Check `GET /api/auth/options/` for that environment; `providers.google.configured` should be `true`. Then complete a real sign-in to verify the credentials and callback with Google.
 
 For local development, the admin URL is `http://localhost:8002/etaalthech2026/`. A `true` readiness value alone does not prove the provider credentials or callback are valid; if OAuth redirects fail after that check, verify the provider console credentials and exact callback URL.
 
@@ -119,7 +116,7 @@ For local development, the admin URL is `http://localhost:8002/etaalthech2026/`.
 
 A social sign-up creates a normal application user and a separate allauth `SocialAccount` link. The social account is identified by its provider and provider user ID; adding a local password does not remove that link. In the Profile page, a social-only user can create a password after their email is verified. The existing **Forgot Password** flow can also set a password while signed out. Both methods update the same user account.
 
-Verified-email auto-linking is enabled for Google and Apple. The provider must supply an email allauth marks verified, and the local address must also be verified and resolve to exactly one active user. Unverified, duplicate, or ambiguous matches are rejected; the adapter does not select an arbitrary user or erase an existing password. Emails are trimmed and lowercased when saved.
+Verified-email auto-linking is enabled for Google. The provider must supply an email allauth marks verified, and the local address must also be verified and resolve to exactly one active user. Unverified, duplicate, or ambiguous matches are rejected; the adapter does not select an arbitrary user or erase an existing password. Emails are trimmed and lowercased when saved.
 
 The Profile page lists linked providers. Disconnecting one requires the account password; social-only users must create a password first. A verified email or another linked provider must remain available before disconnecting the final provider. These checks are enforced by the application endpoint and allauth's own disconnect flow.
 

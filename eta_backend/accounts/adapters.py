@@ -128,12 +128,12 @@ class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):
         return user
 
     def is_email_verified(self, provider, email):
-        if getattr(provider, 'id', None) in {'google', 'apple'}:
+        if getattr(provider, 'id', None) == 'google':
             return False
         return super().is_email_verified(provider, email)
 
     def can_authenticate_by_email(self, sociallogin, email):
-        if getattr(sociallogin.provider, 'id', None) not in {'google', 'apple'}:
+        if getattr(sociallogin.provider, 'id', None) != 'google':
             return False
         return super().can_authenticate_by_email(sociallogin, email)
 

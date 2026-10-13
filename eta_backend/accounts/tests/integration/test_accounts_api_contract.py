@@ -40,20 +40,12 @@ class TestAccountsLoginAPIContract:
             secret='google-client-secret',
         )
         google_app.sites.add(active_site)
-        apple_app = SocialApp.objects.create(
-            provider='apple',
-            name='Apple',
-            client_id='apple-client-id',
-            secret='apple-client-secret',
-        )
-        apple_app.sites.add(other_site)
-
         response = api_client.get('/api/auth/options/')
 
         assert response.status_code == status.HTTP_200_OK
         providers = response.json()['providers']
+        assert set(providers) == {'google'}
         assert providers['google']['configured'] is True
-        assert providers['apple']['configured'] is False
         assert providers['google']['url'].endswith('/accounts/google/login/')
 
     @override_settings(
@@ -63,13 +55,6 @@ class TestAccountsLoginAPIContract:
                 'APP': {
                     'client_id': 'settings-google-client-id',
                     'secret': 'settings-google-client-secret',
-                    'key': '',
-                },
-            },
-            'apple': {
-                'APP': {
-                    'client_id': '',
-                    'secret': '',
                     'key': '',
                 },
             },
@@ -96,7 +81,7 @@ class TestAccountsLoginAPIContract:
             'configured': True,
             'url': 'http://testserver/accounts/google/login/',
         }
-        assert providers['apple'] == {'configured': False, 'url': ''}
+        assert set(providers) == {'google'}
         selected_app = get_social_adapter(response.wsgi_request).get_app(
             response.wsgi_request,
             'google',

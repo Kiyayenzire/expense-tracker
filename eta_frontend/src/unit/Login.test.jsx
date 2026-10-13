@@ -36,23 +36,20 @@ describe('Login unit tests', () => {
     expect(screen.getByText(/please enter both username\/email and password/i)).toBeInTheDocument();
   });
 
-  it('shows Google and Apple options with icons on sign-in and registration', async () => {
+  it('shows Google sign-in on sign-in and registration', async () => {
     const user = userEvent.setup();
     render(<Login onLogin={() => {}} />);
 
     const googleButton = screen.getByRole('button', { name: 'Continue with Google' });
-    const appleButton = screen.getByRole('button', { name: 'Continue with Apple' });
     expect(googleButton).toBeInTheDocument();
-    expect(appleButton).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /continue with apple/i })).not.toBeInTheDocument();
     expect(document.querySelector('.fa-google')).toBeInTheDocument();
-    expect(document.querySelector('.fa-apple')).toBeInTheDocument();
     expect(googleButton).not.toHaveTextContent('Google');
-    expect(appleButton).not.toHaveTextContent('Apple');
 
     await user.click(screen.getByRole('button', { name: /sign up/i }));
 
     expect(screen.getByRole('button', { name: 'Continue with Google' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Continue with Apple' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /continue with apple/i })).not.toBeInTheDocument();
   });
 
   it('does not report providers as unconfigured when the status request fails', async () => {
@@ -73,7 +70,6 @@ describe('Login unit tests', () => {
       data: {
         providers: {
           google: { configured: false, url: '' },
-          apple: { configured: false, url: '' },
         },
         support: {},
       },

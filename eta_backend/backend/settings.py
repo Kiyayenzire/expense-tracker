@@ -53,7 +53,6 @@ INSTALLED_APPS = [
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',
-    'allauth.socialaccount.providers.apple',
     'corsheaders',
     'django_celery_results',
     'django_celery_beat',
@@ -218,14 +217,6 @@ SOCIALACCOUNT_PROVIDERS = {
         },
         'SCOPE': ['profile', 'email'],
         'AUTH_PARAMS': {'access_type': 'online'},
-    },
-    'apple': {
-        'APP': {
-            'client_id': env('APPLE_CLIENT_ID', default=''),
-            'secret': env('APPLE_CLIENT_SECRET', default=''),
-            'key': '',
-        },
-        'SCOPE': ['name', 'email'],
     },
 }
 REST_AUTH = {

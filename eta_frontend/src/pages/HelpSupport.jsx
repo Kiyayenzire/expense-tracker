@@ -9,7 +9,7 @@ const FAQ_DATA = [
   },
   {
     id: 'social-sign-in',
-    question: 'Why is Google or Apple sign-in failing?',
+    question: 'Why is Google sign-in failing?',
     answer: 'Ensure pop-ups and third-party cookies are enabled in your browser settings. Check that your browser account matches your registered email.',
   },
   {
