@@ -884,8 +884,7 @@ body[data-theme="gold"] .header-action-button:hover {
 
 .app-brand-link:hover {
   color: var(--primary);
-  text-decoration: underline;
-  text-decoration-color: currentColor;
+  text-decoration: none;
 }
 
 .app-brand-link:focus-visible {
