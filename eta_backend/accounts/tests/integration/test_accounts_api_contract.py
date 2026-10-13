@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 import re
 from unittest.mock import patch
@@ -12,6 +12,7 @@ from django.core.cache import cache
 from django.core import mail
 from django.contrib.sites.models import Site
 from django.test import override_settings
+from django.utils import timezone
 import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -197,6 +198,61 @@ class TestAccountsLoginAPIContract:
 
         assert response.status_code == status.HTTP_200_OK
         assert response.json()['user']['email_verified'] is False
+        assert response.json()['user']['email_update_required'] is True
+
+    def test_deactivated_email_change_account_must_contact_support(self, api_client, test_user):
+        test_user.email_change_requested_at = timezone.now() - timedelta(days=32)
+        test_user.email_change_deactivated_at = timezone.now()
+        test_user.is_active = False
+        test_user.save(update_fields=[
+            'email_change_requested_at',
+            'email_change_deactivated_at',
+            'is_active',
+        ])
+
+        with patch('django.core.handlers.base.log_response'):
+            response = api_client.post(
+                '/api/auth/login/',
+                {'username': test_user.username, 'password': 'testpass123'},
+                format='json',
+            )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert 'contact support' in response.json()['detail'].lower()
+
+    def test_support_verified_deactivated_account_can_sign_in_before_daily_task(
+        self,
+        api_client,
+        test_user,
+    ):
+        test_user.email_change_requested_at = timezone.now() - timedelta(days=40)
+        test_user.email_change_deactivated_at = timezone.now() - timedelta(days=9)
+        test_user.email_change_original_email = test_user.email
+        test_user.is_active = False
+        test_user.save(update_fields=[
+            'email_change_requested_at',
+            'email_change_deactivated_at',
+            'email_change_original_email',
+            'is_active',
+        ])
+        EmailAddress.objects.create(
+            user=test_user,
+            email=test_user.email,
+            primary=True,
+            verified=True,
+        )
+
+        response = api_client.post(
+            '/api/auth/login/',
+            {'username': test_user.username, 'password': 'testpass123'},
+            format='json',
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        test_user.refresh_from_db()
+        assert test_user.is_active is True
+        assert test_user.email_change_requested_at is None
+        assert test_user.email_change_deactivated_at is None
 
     @override_settings(
         EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
@@ -311,6 +367,8 @@ class TestAccountsProfileAPIContract:
         data = response.json()
         assert data['username'] == 'testuser'
         assert data['email_verified'] is False
+        assert data['email_update_required'] is True
+        assert data['email_change_days_remaining'] == 31
 
     def test_profile_patch_updates_fields(self, authenticated_client, test_user):
         payload = {'first_name': 'Jane', 'last_name': 'Doe', 'phone_number': '0700000000'}
@@ -320,6 +378,120 @@ class TestAccountsProfileAPIContract:
         assert data['first_name'] == 'Jane'
         assert data['last_name'] == 'Doe'
         assert data['phone_number'] == '0700000000'
+
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+        FRONTEND_URL='http://localhost:5174',
+    )
+    def test_profile_email_change_requires_verification_and_keeps_old_address_until_confirmed(
+        self,
+        authenticated_client,
+        test_user,
+    ):
+        response = authenticated_client.patch(
+            '/api/auth/profile/',
+            {'email': 'new-address@example.com'},
+            format='multipart',
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data['email'] == test_user.email
+        assert data['pending_email'] == 'new-address@example.com'
+        assert data['email_change_pending'] is True
+        assert data['email_update_required'] is True
+        assert data['email_change_days_remaining'] == 31
+        test_user.refresh_from_db()
+        assert test_user.email == 'test@example.com'
+        assert test_user.email_change_requested_at is not None
+        address = EmailAddress.objects.get(user=test_user, email='new-address@example.com')
+        assert address.verified is False
+        assert address.primary is False
+        assert len(mail.outbox) == 1
+
+        started_at = test_user.email_change_requested_at
+        repeat_response = authenticated_client.patch(
+            '/api/auth/profile/',
+            {'email': 'new-address@example.com', 'first_name': 'Jane'},
+            format='multipart',
+        )
+        assert repeat_response.status_code == status.HTTP_200_OK
+        test_user.refresh_from_db()
+        assert test_user.email_change_requested_at == started_at
+        assert len(mail.outbox) == 1
+
+        verification_match = re.search(r'#/verify-email/([^\s]+)', mail.outbox[-1].body)
+        assert verification_match
+        confirmation_key = unquote(verification_match.group(1))
+        with patch('allauth.account.adapter.DefaultAccountAdapter.add_message'):
+            verification_response = authenticated_client.post(
+                '/api/auth/registration/verify-email/',
+                {'key': confirmation_key},
+                format='json',
+            )
+
+        assert verification_response.status_code == status.HTTP_200_OK
+        test_user.refresh_from_db()
+        address.refresh_from_db()
+        assert test_user.email == 'new-address@example.com'
+        assert test_user.email_change_requested_at is None
+        assert address.verified is True
+        assert address.primary is True
+        assert verification_response.json()['email_update_required'] is False
+
+    def test_profile_email_change_rejects_another_users_address(self, authenticated_client, test_user, db):
+        User.objects.create_user(
+            username='other-user',
+            email='taken@example.com',
+            password='testpass123',
+        )
+
+        response = authenticated_client.patch(
+            '/api/auth/profile/',
+            {'email': 'taken@example.com'},
+            format='multipart',
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'already in use' in str(response.json()).lower()
+
+    def test_verifying_legacy_email_does_not_clear_pending_email_change(
+        self,
+        authenticated_client,
+        test_user,
+    ):
+        test_user.email_change_requested_at = timezone.now()
+        test_user.email_change_original_email = test_user.email
+        test_user.save(update_fields=['email_change_requested_at', 'email_change_original_email'])
+        current_address = EmailAddress.objects.create(
+            user=test_user,
+            email=test_user.email,
+            primary=True,
+            verified=False,
+        )
+        pending_address = EmailAddress.objects.create(
+            user=test_user,
+            email='new-address@example.com',
+            primary=False,
+            verified=False,
+        )
+        confirmation = get_emailconfirmation_model().create(current_address)
+
+        with patch('allauth.account.adapter.DefaultAccountAdapter.add_message'):
+            response = authenticated_client.post(
+                '/api/auth/registration/verify-email/',
+                {'key': confirmation.key},
+                format='json',
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        test_user.refresh_from_db()
+        current_address.refresh_from_db()
+        pending_address.refresh_from_db()
+        assert current_address.verified is True
+        assert pending_address.verified is False
+        assert test_user.email_change_requested_at is not None
+        assert response.json()['pending_email'] == pending_address.email
 
 
 @pytest.mark.integration

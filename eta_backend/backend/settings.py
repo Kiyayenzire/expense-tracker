@@ -307,6 +307,10 @@ CELERY_RESULT_SERIALIZER = 'json'
 
 # Celery Beat Periodic Schedule
 CELERY_BEAT_SCHEDULE = {
+    'process-email-change-lifecycle-daily': {
+        'task': 'accounts.tasks.process_email_change_lifecycle',
+        'schedule': crontab(hour=2, minute=15),
+    },
     'send-currency-reminder-mon-tue': {
         'task': 'expenses.tasks.send_currency_update_reminder',
         'schedule': crontab(day_of_week='monday,tuesday', hour=9, minute=0),

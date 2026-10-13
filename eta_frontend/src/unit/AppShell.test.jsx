@@ -37,6 +37,29 @@ describe('AppShell email verification notice', () => {
     expect(screen.queryByText(/private@example\.com/i)).not.toBeInTheDocument();
   });
 
+  it('shows the email-change deadline for an existing user', () => {
+    render(
+      <AppShell
+        token="token"
+        currentUser={{
+          email: 'old@example.com',
+          email_verified: true,
+          email_change_pending: true,
+          pending_email: 'new@example.com',
+          email_change_days_remaining: 31,
+          email_update_required: true,
+        }}
+        displayCurrency="EUR"
+      >
+        <div>Page content</div>
+      </AppShell>,
+    );
+
+    expect(screen.getByText(/verify your new email address/i)).toBeInTheDocument();
+    expect(screen.getByText(/new@example\.com within 31 days/i)).toBeInTheDocument();
+    expect(screen.getByText(/97 days after deactivation/i)).toBeInTheDocument();
+  });
+
   it('resends verification, confirms it was sent, and hides the resend button', async () => {
     post.mockResolvedValue({ data: {} });
     render(

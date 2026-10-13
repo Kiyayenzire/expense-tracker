@@ -44,3 +44,10 @@ def send_registration_verification_email(self, email_address_id):
         return send_registration_verification_email_now(email_address_id)
     except Exception as error:
         raise self.retry(exc=error)
+
+
+@shared_task
+def process_email_change_lifecycle():
+    from .models import User
+
+    return User.objects.process_email_change_lifecycle()

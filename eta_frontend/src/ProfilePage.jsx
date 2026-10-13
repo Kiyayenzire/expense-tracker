@@ -3,14 +3,20 @@ import { useEffect, useMemo, useState } from 'react';
 const initialProfile = {
   username: '',
   email: '',
+  saved_email: '',
   first_name: '',
   last_name: '',
   phone_number: '',
   monthly_income: '0.00',
   profile_picture_url: '',
+  pending_email: '',
+  email_change_deadline: null,
+  email_change_days_remaining: null,
+  email_change_pending: false,
+  email_update_required: false,
 };
 
-export default function ProfilePage({ token, onLogout, theme, setTheme, onNavigate, username, profilePicture, setProfilePicture, setUsername, onDeleteAccount }) {
+export default function ProfilePage({ token, onLogout, theme, setTheme, onNavigate, username, profilePicture, setProfilePicture, setUsername, onDeleteAccount, onUserUpdated }) {
   const [profile, setProfile] = useState(initialProfile);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -43,14 +49,21 @@ export default function ProfilePage({ token, onLogout, theme, setTheme, onNaviga
         }
 
         const data = await response.json();
+        const displayedEmail = data.pending_email || data.email || '';
         setProfile({
           username: data.username || '',
-          email: data.email || '',
+          email: displayedEmail,
+          saved_email: displayedEmail,
           first_name: data.first_name || '',
           last_name: data.last_name || '',
           phone_number: data.phone_number || '',
           monthly_income: data.monthly_income || '0.00',
           profile_picture_url: data.profile_picture_url || '',
+          pending_email: data.pending_email || '',
+          email_change_deadline: data.email_change_deadline || null,
+          email_change_days_remaining: data.email_change_days_remaining ?? null,
+          email_change_pending: Boolean(data.email_change_pending),
+          email_update_required: Boolean(data.email_update_required),
         });
         setHasUsablePassword(Boolean(data.has_usable_password));
         setSocialProviders(data.social_providers || []);
@@ -97,9 +110,11 @@ export default function ProfilePage({ token, onLogout, theme, setTheme, onNaviga
     setSaving(true);
     setError('');
     setSuccess('');
+    const emailChanged = profile.email.trim().toLowerCase() !== (profile.saved_email || profile.email).trim().toLowerCase();
 
     try {
       const formData = new FormData();
+      formData.append('email', profile.email.trim());
       formData.append('first_name', profile.first_name || '');
       formData.append('last_name', profile.last_name || '');
       formData.append('phone_number', profile.phone_number || '');
@@ -118,6 +133,28 @@ export default function ProfilePage({ token, onLogout, theme, setTheme, onNaviga
 
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
+        if (data.email_change_pending) {
+          setProfile((current) => ({
+            ...current,
+            email: data.pending_email || current.email,
+            saved_email: data.pending_email || current.saved_email,
+            pending_email: data.pending_email || '',
+            email_change_deadline: data.email_change_deadline || null,
+            email_change_days_remaining: data.email_change_days_remaining ?? null,
+            email_change_pending: true,
+            email_update_required: true,
+          }));
+          onUserUpdated?.({
+            id: data.id,
+            email: data.email,
+            email_verified: data.email_verified,
+            pending_email: data.pending_email,
+            email_change_pending: data.email_change_pending,
+            email_change_deadline: data.email_change_deadline,
+            email_change_days_remaining: data.email_change_days_remaining,
+            email_update_required: true,
+          });
+        }
         const message = data.detail || data.non_field_errors?.[0] || 'Unable to save profile changes.';
         throw new Error(message);
       }
@@ -135,15 +172,35 @@ export default function ProfilePage({ token, onLogout, theme, setTheme, onNaviga
       setProfile((current) => ({
         ...current,
         username: data.username || current.username,
-        email: data.email || current.email,
+        email: data.pending_email || data.email || current.email,
+        saved_email: data.pending_email || data.email || current.saved_email,
         profile_picture_url: nextPicture,
+        pending_email: data.pending_email || '',
+        email_change_deadline: data.email_change_deadline || null,
+        email_change_days_remaining: data.email_change_days_remaining ?? null,
+        email_change_pending: Boolean(data.email_change_pending),
+        email_update_required: Boolean(data.email_update_required),
       }));
+      onUserUpdated?.({
+        id: data.id,
+        email: data.email,
+        email_verified: data.email_verified,
+        pending_email: data.pending_email,
+        email_change_pending: data.email_change_pending,
+        email_update_required: data.email_update_required,
+        email_change_deadline: data.email_change_deadline,
+        email_change_days_remaining: data.email_change_days_remaining,
+      });
       setPreviewUrl(nextPicture);
       setSelectedImage(null);
-      setSuccess('Profile updated successfully.');
-      window.setTimeout(() => {
-        if (onNavigate) onNavigate('dashboard');
-      }, 250);
+      if (emailChanged && data.email_change_pending) {
+        setSuccess(`Verification email sent to ${data.pending_email}. Verify it within ${data.email_change_days_remaining} days to keep your account active.`);
+      } else {
+        setSuccess('Profile updated successfully.');
+        window.setTimeout(() => {
+          if (onNavigate) onNavigate('dashboard');
+        }, 250);
+      }
     } catch (submitError) {
       setError(submitError.message || 'Unable to save profile changes.');
     } finally {
@@ -254,7 +311,20 @@ export default function ProfilePage({ token, onLogout, theme, setTheme, onNaviga
                 </div>
                 <div className="form-group">
                   <label htmlFor="profile-email">Email</label>
-                  <input id="profile-email" className="form-control" type="email" value={profile.email} disabled />
+                  <input id="profile-email" className="form-control" type="email" value={profile.email} onChange={(event) => setProfile((current) => ({ ...current, email: event.target.value }))} />
+                  {profile.email_change_pending && (
+                    <small className="text-muted">
+                      Verify {profile.pending_email} within {profile.email_change_days_remaining} days. Your account will be deactivated if it remains unverified.
+                    </small>
+                  )}
+                  {profile.email_update_required && !profile.email_change_pending && (
+                    <small className="text-muted">
+                      Verify this address or update it within {profile.email_change_days_remaining} days to avoid deactivation.
+                    </small>
+                  )}
+                  {!profile.email_update_required && (
+                    <small className="text-muted">Changing your email sends a verification link. Your current email remains active until you verify the new one.</small>
+                  )}
                 </div>
               </div>
 

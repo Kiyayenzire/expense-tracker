@@ -92,6 +92,8 @@ Do not commit real secrets to version control. For production, use a secure `.en
 
 Password registrations remain inactive until the user opens the verification link sent to their email. In development, `.env.dev` uses Django's console email backend, so the message is printed in the backend container logs. Production uses the configured `EMAIL_BACKEND` and SMTP settings from the production environment.
 
+Existing non-staff accounts with an unverified email, and existing users who request an email change, have 31 days to verify an address. Email changes remain pending until verified; the current sign-in email stays in place in the meantime. Accounts still unverified at the deadline are deactivated and can only be restored by support. Deactivated accounts are permanently deleted after a further 97 days. Staff and superuser accounts are excluded. The daily `process_email_change_lifecycle` Celery Beat task enforces these deadlines, so keep Celery Beat running in production.
+
 Google and Apple sign-in are optional and must be configured separately in each environment's database. Password-based registration and sign-in do not depend on these providers.
 
 When the login screen loads, it requests `GET /api/auth/options/`. A provider is reported as configured when a Django Social Application for that provider is associated with the Site whose ID is `SITE_ID` (default `1`). This check confirms the database record and Site association only; it does not test the credentials or the provider's OAuth callback. If the request itself fails, the login screen reports that availability could not be checked instead of claiming the provider is unconfigured.

@@ -49,11 +49,32 @@ export function AppShell({ token, onLogout, theme, setTheme, onNavigate, onDelet
     >
       <Header activePage={activePage} onNavigate={onNavigate} onLogout={onLogout} onDeleteAccount={onDeleteAccount} theme={theme} setTheme={setTheme} username={username} profilePicture={profilePicture} queuedCount={queuedCount} isSyncing={isSyncing} />
       {verificationNotice && <p className="verification-result" role="status">{verificationNotice}</p>}
-      {currentUser?.email && currentUser.email_verified === false && (
+      {currentUser?.email && (currentUser.email_change_pending || currentUser.email_verified === false) && (
         <section className="warning-banner email-verification-banner" role="status">
           <div>
-            <strong>Your email address is not verified.</strong>
-            <p>Verify your email to keep full access to your account.</p>
+            {currentUser.email_change_pending ? (
+              <>
+                <strong>Verify your new email address.</strong>
+                <p>
+                  Verify {currentUser.pending_email || 'your new email'} within {currentUser.email_change_days_remaining} days.
+                  If it remains unverified, your account will be deactivated; contact support to restore access.
+                  If not restored, your account will be permanently deleted 97 days after deactivation.
+                </p>
+              </>
+            ) : (
+              <>
+                <strong>Your email address is not verified.</strong>
+                {currentUser.email_update_required ? (
+                  <p>
+                    Verify or update your email within {currentUser.email_change_days_remaining} days.
+                    If it remains unverified, your account will be deactivated; contact support to restore access.
+                    If not restored, your account will be permanently deleted 97 days after deactivation.
+                  </p>
+                ) : (
+                  <p>Verify your email to keep full access to your account.</p>
+                )}
+              </>
+            )}
             {verificationMessage && <p className="verification-feedback">{verificationMessage}</p>}
           </div>
           {!verificationSent && (

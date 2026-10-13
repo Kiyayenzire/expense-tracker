@@ -112,7 +112,16 @@ function App() {
         if (!response.ok) throw new Error(data.detail || 'Unable to verify your email address.');
         if (isCurrent) {
           emailVerifiedRef.current = true;
-          setCurrentUser((user) => user ? { ...user, email_verified: true } : user);
+          setCurrentUser((user) => user ? {
+            ...user,
+            email: data.email || user.email,
+            email_verified: data.email_verified,
+            pending_email: data.pending_email,
+            email_change_pending: data.email_change_pending,
+            email_change_deadline: data.email_change_deadline,
+            email_change_days_remaining: data.email_change_days_remaining,
+            email_update_required: data.email_update_required,
+          } : user);
           setVerificationNotice(data.detail || 'Email verified successfully.');
         }
       })
@@ -149,6 +158,11 @@ function App() {
           id: data.id,
           email: data.email,
           email_verified: data.email_verified || emailVerifiedRef.current,
+          pending_email: data.pending_email,
+          email_change_pending: data.email_change_pending,
+          email_change_deadline: data.email_change_deadline,
+          email_change_days_remaining: data.email_change_days_remaining,
+          email_update_required: data.email_update_required,
         });
         const nextUsername = data.username || localStorage.getItem(USERNAME_KEY) || username || 'User';
         const nextPicture = data.profile_picture_url || data.profile_picture || localStorage.getItem(PROFILE_PICTURE_KEY) || '';
@@ -193,6 +207,11 @@ function App() {
         id: loggedInUser.id,
         email: loggedInUser.email,
         email_verified: loggedInUser.email_verified,
+        pending_email: loggedInUser.pending_email,
+        email_change_pending: loggedInUser.email_change_pending,
+        email_change_deadline: loggedInUser.email_change_deadline,
+        email_change_days_remaining: loggedInUser.email_change_days_remaining,
+        email_update_required: loggedInUser.email_update_required,
       });
     }
   }
@@ -304,6 +323,7 @@ function App() {
           profilePicture={profilePicture}
           setProfilePicture={setProfilePicture}
           setUsername={setUsername}
+          onUserUpdated={setCurrentUser}
         />
       ) : page === 'add-expense' ? (
         <AddExpensePage token={token} onLogout={handleLogout} onNavigate={navigate} />

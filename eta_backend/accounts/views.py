@@ -81,6 +81,7 @@ def social_login_exchange(request):
     user = User.objects.filter(pk=user_id, is_active=True).first()
     if user is None:
         return Response({'detail': 'This account is not active.'}, status=status.HTTP_403_FORBIDDEN)
+    user.start_email_change_deadline_if_unverified()
 
     token, _ = Token.objects.get_or_create(user=user)
     return Response({
@@ -133,12 +134,21 @@ def resend_registration_verification(request):
     if request.user.is_authenticated:
         user = request.user
     elif email:
-        user = User.objects.filter(email__iexact=email, is_active=False).first()
+        user = User.objects.filter(
+            email__iexact=email,
+            is_active=False,
+            email_change_requested_at__isnull=True,
+        ).first()
     else:
         return Response({'email': ['Enter the email address used to register.']}, status=status.HTTP_400_BAD_REQUEST)
 
     address = None
-    if user and user.email:
+    if user and user.email_change_requested_at:
+        address = EmailAddress.objects.filter(
+            user=user,
+            verified=False,
+        ).exclude(email__iexact=user.email).order_by('-id').first()
+    elif user and user.email:
         address, _ = EmailAddress.objects.get_or_create(
             user=user,
             email=user.email,
@@ -179,7 +189,10 @@ def verify_registration_email(request):
     if email_address is None:
         return Response({'detail': 'This email address could not be verified.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    return Response({'detail': 'Email verified. Your account is ready to sign in.'}, status=status.HTTP_200_OK)
+    return Response({
+        **UserProfileSerializer(email_address.user).data,
+        'detail': 'Email verified. Your account is ready to sign in.',
+    }, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
@@ -203,7 +216,16 @@ def custom_login(request):
             'detail': 'Incorrect password. Please try again or use the forgot password link.'
         }, status=status.HTTP_400_BAD_REQUEST)
 
+    user.start_email_change_deadline_if_unverified()
+    user.reconcile_email_change_verification()
+    user.deactivate_if_email_change_expired()
+    user.refresh_from_db(fields=['is_active', 'email_change_deactivated_at'])
+
     if not user.is_active:
+        if user.email_change_deactivated_at is not None:
+            return Response({
+                'detail': 'This account was deactivated because its email address was not verified in time. Contact support to verify your email and restore access. If not restored, it will be permanently deleted 97 days after deactivation.'
+            }, status=status.HTTP_403_FORBIDDEN)
         email_address = EmailAddress.objects.filter(user=user, email__iexact=user.email).first()
         if email_address and not email_address.verified:
             return Response({
@@ -240,11 +262,28 @@ def profile_details(request):
     user = request.user
 
     if request.method == 'GET':
+        user.start_email_change_deadline_if_unverified()
         return Response(UserProfileSerializer(user, context={'request': request}).data)
 
     serializer = UserProfileSerializer(user, data=request.data, partial=True, context={'request': request})
     if serializer.is_valid():
         serializer.save()
+        email_address_id = serializer.context.get('email_change_address_id')
+        if email_address_id:
+            try:
+                if not send_registration_verification_email_now(email_address_id):
+                    raise RuntimeError('The pending email address is no longer available.')
+            except Exception:
+                logger.exception('Failed to send email-change verification for user_id=%s', user.pk)
+                payload = UserProfileSerializer(
+                    user,
+                    context={'request': request},
+                ).data
+                payload['detail'] = (
+                    'Your email change is pending, but we could not send the verification email. '
+                    'Please try resending it.'
+                )
+                return Response(payload, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         return Response(UserProfileSerializer(user, context={'request': request}).data)
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

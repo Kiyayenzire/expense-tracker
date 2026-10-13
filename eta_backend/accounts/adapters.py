@@ -49,10 +49,53 @@ class CustomAccountAdapter(DefaultAccountAdapter):
         return f"{frontend_url}/#/verify-email/{emailconfirmation.key}"
 
     def confirm_email(self, request, email_address):
+        user = email_address.user
+        is_pending_change = (
+            user.email_change_requested_at is not None
+            and email_address.email.lower() != user.email.lower()
+        )
+        is_current_address = email_address.email.lower() == user.email.lower()
+        has_pending_change = EmailAddress.objects.filter(
+            user=user,
+            verified=False,
+        ).exclude(email__iexact=user.email).exists()
+        if user.email_change_deactivated_at is not None and (is_pending_change or is_current_address):
+            return False
+
         confirmed = super().confirm_email(request, email_address)
-        if confirmed and not email_address.user.is_active:
-            email_address.user.is_active = True
-            email_address.user.save(update_fields=['is_active'])
+        if not confirmed:
+            return False
+
+        if is_pending_change:
+            EmailAddress.objects.filter(user=user, primary=True).exclude(pk=email_address.pk).update(primary=False)
+            email_address.primary = True
+            email_address.save(update_fields=['primary'])
+            user.email = email_address.email
+            user.email_change_requested_at = None
+            user.email_change_deactivated_at = None
+            user.email_change_original_email = ''
+            user.save(update_fields=[
+                'email',
+                'email_change_requested_at',
+                'email_change_deactivated_at',
+                'email_change_original_email',
+            ])
+        elif (
+            is_current_address
+            and user.email_change_requested_at is not None
+            and not has_pending_change
+        ):
+            user.email_change_requested_at = None
+            user.email_change_deactivated_at = None
+            user.email_change_original_email = ''
+            user.save(update_fields=[
+                'email_change_requested_at',
+                'email_change_deactivated_at',
+                'email_change_original_email',
+            ])
+        elif not user.is_active and user.email_change_deactivated_at is None:
+            user.is_active = True
+            user.save(update_fields=['is_active'])
         return confirmed
 
 
