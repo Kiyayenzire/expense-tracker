@@ -209,6 +209,25 @@ SOCIALACCOUNT_LOGIN_ON_GET = True
 SOCIALACCOUNT_EMAIL_VERIFICATION = 'mandatory'
 SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
 SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'APP': {
+            'client_id': env('GOOGLE_CLIENT_ID', default=''),
+            'secret': env('GOOGLE_CLIENT_SECRET', default=''),
+            'key': '',
+        },
+        'SCOPE': ['profile', 'email'],
+        'AUTH_PARAMS': {'access_type': 'online'},
+    },
+    'apple': {
+        'APP': {
+            'client_id': env('APPLE_CLIENT_ID', default=''),
+            'secret': env('APPLE_CLIENT_SECRET', default=''),
+            'key': '',
+        },
+        'SCOPE': ['name', 'email'],
+    },
+}
 REST_AUTH = {
     'REGISTER_SERIALIZER': 'accounts.serializers.EmailVerificationRegisterSerializer',
 }

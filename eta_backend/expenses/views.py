@@ -1,10 +1,11 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from django.core.cache import cache
 from django.http import HttpResponse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Case, IntegerField, Sum, Value, When
 
@@ -242,6 +243,8 @@ def current_rates(request):
             defaults={'name': meta['name'], 'symbol': meta['symbol'], 'is_active': True},
         )
 
+    today = timezone.localdate()
+    week_start = today - timedelta(days=today.weekday())
     matrix = {}
     for base in symbols:
         base_currency = Currency.objects.filter(code=base).first()
@@ -255,9 +258,30 @@ def current_rates(request):
             if base == target:
                 row[target] = 1.0
                 continue
+            manual = CurrencyRate.objects.filter(
+                base_currency=base_currency,
+                target_currency=target_currency,
+                effective_date__gte=week_start,
+                effective_date__lte=today,
+                is_manual=True,
+            ).order_by('-effective_date', '-id').first()
+            if manual:
+                row[target] = float(manual.rate)
+                continue
+            reverse_manual = CurrencyRate.objects.filter(
+                base_currency=target_currency,
+                target_currency=base_currency,
+                effective_date__gte=week_start,
+                effective_date__lte=today,
+                is_manual=True,
+            ).order_by('-effective_date', '-id').first()
+            if reverse_manual and reverse_manual.rate:
+                row[target] = float(1 / reverse_manual.rate)
+                continue
             latest = CurrencyRate.objects.filter(
                 base_currency=base_currency,
                 target_currency=target_currency,
+                effective_date__lte=today,
             ).order_by('-effective_date', '-id').first()
             if latest:
                 row[target] = float(latest.rate)
@@ -265,6 +289,7 @@ def current_rates(request):
             reverse = CurrencyRate.objects.filter(
                 base_currency=target_currency,
                 target_currency=base_currency,
+                effective_date__lte=today,
             ).order_by('-effective_date', '-id').first()
             row[target] = float(1 / reverse.rate) if reverse and reverse.rate else 1.0
         matrix[base] = row

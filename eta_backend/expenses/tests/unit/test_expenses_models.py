@@ -1,9 +1,9 @@
 from decimal import Decimal
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
-from expenses.models import ExpenseEntry
+from expenses.models import Currency, CurrencyRate, ExpenseEntry
 
 
 @pytest.mark.unit
@@ -34,3 +34,35 @@ class TestExpenseEntryModel:
             currency=currency,
         )
         assert expense.quantity == Decimal('1')
+
+    def test_new_expense_prefers_manual_rate_over_newer_weekly_snapshot(
+        self, db, test_user, category, item
+    ):
+        today = date.today()
+        week_start = today - timedelta(days=today.weekday())
+        ugx = Currency.objects.create(code='UGX', name='Ugandan Shilling')
+        eur = Currency.objects.create(code='EUR', name='Euro')
+        CurrencyRate.objects.create(
+            base_currency=ugx,
+            target_currency=eur,
+            rate=Decimal('0.0002500000000'),
+            effective_date=week_start + timedelta(days=1),
+            is_manual=True,
+        )
+        CurrencyRate.objects.create(
+            base_currency=ugx,
+            target_currency=eur,
+            rate=Decimal('0.0002000000000'),
+            effective_date=week_start + timedelta(days=2),
+        )
+        expense = ExpenseEntry.objects.create(
+            user=test_user,
+            date=week_start + timedelta(days=6),
+            category=category,
+            item=item,
+            amount=Decimal('10000'),
+            currency=ugx,
+        )
+
+        assert expense.applied_rate_to_eur == Decimal('0.000250')
+        assert expense.amount_base_eur == Decimal('2.50')

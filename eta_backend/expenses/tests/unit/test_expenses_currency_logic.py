@@ -1,5 +1,5 @@
 from decimal import Decimal
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
@@ -18,6 +18,35 @@ class TestCurrencyService:
     def test_get_latest_rate_from_database(self, currency_rate):
         rate = CurrencyService.get_latest_rate('EUR', 'USD')
         assert rate == 1.1
+
+    @pytest.mark.django_db
+    def test_get_rate_for_date_prefers_manual_rate_over_newer_weekly_snapshot(
+        self, currency
+    ):
+        today = date.today()
+        week_start = today - timedelta(days=today.weekday())
+        ugx = Currency.objects.create(code='UGX', name='Ugandan Shilling')
+        CurrencyRate.objects.create(
+            base_currency=currency,
+            target_currency=ugx,
+            rate=Decimal('4200'),
+            effective_date=week_start + timedelta(days=1),
+            is_manual=True,
+        )
+        CurrencyRate.objects.create(
+            base_currency=currency,
+            target_currency=ugx,
+            rate=Decimal('4100'),
+            effective_date=week_start + timedelta(days=2),
+        )
+
+        rate = CurrencyService.get_rate_for_date(
+            'EUR',
+            'UGX',
+            week_start + timedelta(days=6),
+        )
+
+        assert rate == 4200.0
 
     @pytest.mark.django_db
     def test_convert_amount(self, currency_rate):

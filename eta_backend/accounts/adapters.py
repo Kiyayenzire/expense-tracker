@@ -57,6 +57,24 @@ class CustomAccountAdapter(DefaultAccountAdapter):
 
 
 class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):
+    def list_apps(self, request, provider=None, client_id=None):
+        apps = super().list_apps(request, provider=provider, client_id=client_id)
+        configured_providers = {
+            provider_id
+            for provider_id, provider_settings in settings.SOCIALACCOUNT_PROVIDERS.items()
+            if (app_config := provider_settings.get('APP'))
+            and app_config.get('client_id')
+            and app_config.get('secret')
+        }
+        if provider in configured_providers:
+            return [app for app in apps if app.provider == provider and app.pk is None]
+        if provider is None and configured_providers:
+            return [
+                app for app in apps
+                if app.provider not in configured_providers or app.pk is None
+            ]
+        return apps
+
     def populate_user(self, request, sociallogin, data):
         normalized_data = dict(data)
         if 'email' in normalized_data:

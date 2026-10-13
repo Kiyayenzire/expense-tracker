@@ -1,6 +1,7 @@
 """
 Custom password reset and account management views for the accounts app.
 """
+import logging
 import secrets
 
 from django.contrib.auth import authenticate, get_user_model, update_session_auth_hash
@@ -9,7 +10,8 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError as DjangoValidationError
 from allauth.account.models import EmailAddress
-from allauth.socialaccount.models import SocialAccount, SocialApp
+from allauth.socialaccount.adapter import get_adapter as get_social_adapter
+from allauth.socialaccount.models import SocialAccount
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.core.mail import send_mail
@@ -28,24 +30,24 @@ from .serializers import EmailVerificationRegisterSerializer, UserProfileSeriali
 from .tasks import send_registration_verification_email_now
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def auth_options(request):
-    configured_providers = set(
-        SocialApp.objects.filter(sites__id=settings.SITE_ID, provider__in=['google', 'apple'])
-        .values_list('provider', flat=True)
-        .distinct()
-    )
+    social_adapter = get_social_adapter(request)
+    providers = {}
+    for provider in ('google', 'apple'):
+        apps = social_adapter.list_apps(request, provider=provider)
+        configured = any(app.client_id and app.secret for app in apps)
+        providers[provider] = {
+            'configured': configured,
+            'url': request.build_absolute_uri(f'/accounts/{provider}/login/') if configured else '',
+        }
+
     return Response({
-        'providers': {
-            provider: {
-                'configured': provider in configured_providers,
-                'url': request.build_absolute_uri(f'/accounts/{provider}/login/'),
-            }
-            for provider in ('google', 'apple')
-        },
+        'providers': providers,
         'support': {
             'email': settings.SUPPORT_EMAIL,
             'phone': settings.SUPPORT_PHONE,
@@ -110,6 +112,7 @@ def register_user(request):
         if not send_registration_verification_email_now(email_address.pk):
             raise RuntimeError('The verification email address is no longer available.')
     except Exception:
+        logger.exception('Failed to send registration verification email for user_id=%s', user.pk)
         return Response({
             'detail': 'Your account is pending verification, but we could not send the email. Please use resend verification email to try again.',
             'email': user.email,
@@ -147,6 +150,7 @@ def resend_registration_verification(request):
             if not send_registration_verification_email_now(address.pk):
                 raise RuntimeError('The verification email address is no longer available.')
         except Exception:
+            logger.exception('Failed to resend verification email for user_id=%s', user.pk)
             return Response({
                 'detail': 'We could not send the verification email. Please try again shortly.'
             }, status=status.HTTP_503_SERVICE_UNAVAILABLE)

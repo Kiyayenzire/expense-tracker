@@ -5,6 +5,7 @@ from unittest.mock import patch
 from urllib.parse import unquote
 
 from allauth.account.models import EmailAddress, get_emailconfirmation_model
+from allauth.socialaccount.adapter import get_adapter as get_social_adapter
 from allauth.socialaccount.models import SocialAccount, SocialApp
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
@@ -21,7 +22,7 @@ User = get_user_model()
 @pytest.mark.integration
 @pytest.mark.django_db
 class TestAccountsLoginAPIContract:
-    @override_settings(SITE_ID=1)
+    @override_settings(SITE_ID=1, SOCIALACCOUNT_PROVIDERS={})
     def test_social_auth_options_only_enable_apps_linked_to_current_site(self, api_client):
         active_site, _ = Site.objects.get_or_create(
             pk=1,
@@ -53,6 +54,53 @@ class TestAccountsLoginAPIContract:
         assert providers['google']['configured'] is True
         assert providers['apple']['configured'] is False
         assert providers['google']['url'].endswith('/accounts/google/login/')
+
+    @override_settings(
+        SITE_ID=1,
+        SOCIALACCOUNT_PROVIDERS={
+            'google': {
+                'APP': {
+                    'client_id': 'settings-google-client-id',
+                    'secret': 'settings-google-client-secret',
+                    'key': '',
+                },
+            },
+            'apple': {
+                'APP': {
+                    'client_id': '',
+                    'secret': '',
+                    'key': '',
+                },
+            },
+        },
+    )
+    def test_social_auth_options_use_environment_provider_credentials(self, api_client):
+        active_site, _ = Site.objects.get_or_create(
+            pk=1,
+            defaults={'domain': 'localhost', 'name': 'localhost'},
+        )
+        database_app = SocialApp.objects.create(
+            provider='google',
+            name='Old database Google app',
+            client_id='database-google-client-id',
+            secret='database-google-client-secret',
+        )
+        database_app.sites.add(active_site)
+
+        response = api_client.get('/api/auth/options/')
+
+        assert response.status_code == status.HTTP_200_OK
+        providers = response.json()['providers']
+        assert providers['google'] == {
+            'configured': True,
+            'url': 'http://testserver/accounts/google/login/',
+        }
+        assert providers['apple'] == {'configured': False, 'url': ''}
+        selected_app = get_social_adapter(response.wsgi_request).get_app(
+            response.wsgi_request,
+            'google',
+        )
+        assert selected_app.client_id == 'settings-google-client-id'
 
     def test_login_requires_credentials(self, api_client):
         response = api_client.post('/api/auth/login/', {'username': '', 'password': ''})
@@ -154,7 +202,7 @@ class TestAccountsLoginAPIContract:
         EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
         FRONTEND_URL='http://localhost:5174',
     )
-    def test_verification_send_failure_is_returned_to_authenticated_user(self, authenticated_client):
+    def test_verification_send_failure_is_logged_and_returned_to_authenticated_user(self, authenticated_client, caplog):
         with patch('accounts.tasks.send_mail', side_effect=OSError('SMTP unavailable')):
             with patch('django.core.handlers.base.log_response'):
                 response = authenticated_client.post(
@@ -164,6 +212,8 @@ class TestAccountsLoginAPIContract:
 
         assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
         assert 'could not send' in response.json()['detail'].lower()
+        assert 'Failed to resend verification email' in caplog.text
+        assert 'SMTP unavailable' in caplog.text
 
     @override_settings(
         EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',

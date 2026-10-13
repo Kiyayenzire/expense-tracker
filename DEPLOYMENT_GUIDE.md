@@ -77,6 +77,30 @@ After CI passes on a push to `main`, the same workflow publishes images and depl
 
 The frontend Help & Support page sends email to `zoelewis.58@gmail.com`. Override `VITE_SUPPORT_EMAIL` in the frontend environment or GitHub Actions repository variables only if the support address changes.
 
+### Google and Apple sign-in
+
+Social sign-in credentials are read from the server's untracked `.env`; no `SocialApp` rows need to be created in Django Admin. Add the provider credentials there:
+
+```env
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+APPLE_CLIENT_ID=your-apple-services-id
+APPLE_CLIENT_SECRET=your-generated-apple-client-secret
+```
+
+Register these allauth callback URLs with the providers:
+
+- Google: `https://eta.althech.com/accounts/google/login/callback/`
+- Apple: `https://eta.althech.com/accounts/apple/login/callback/`
+
+The options endpoint reports a provider as configured only when both its client ID and secret are present. It returns the allauth login paths under `/accounts/` (for example, `/accounts/google/login/`); `/api/auth/` is the API prefix and is not where allauth's provider login routes are mounted. The reverse proxy must route `/accounts/` to Django.
+
+Apple's client secret must be a valid Sign in with Apple client-secret JWT generated for the configured Services ID and signing key. Keep all secrets out of source control. After updating `.env`, recreate the backend so it loads the credentials:
+
+```bash
+docker compose up -d --force-recreate backend
+```
+
 For production email delivery where outbound SMTP is blocked, use Resend over HTTPS. Add `EMAIL_BACKEND=anymail.backends.resend.EmailBackend` and `RESEND_API_KEY` to the server's untracked `.env`; set `DEFAULT_FROM_EMAIL` to a sender address accepted by Resend and set `REMINDER_RECIPIENT_EMAIL` to the mailbox that should receive currency reminders. If the reminder recipient is unset, the existing `CURRENCY_ADMIN_EMAIL` setting is used. The production image installs `django-anymail[resend]` from `eta_backend/requirements/prod.txt`. For delivery to arbitrary recipients, verify your sending domain in Resend and use an address on that domain as the sender; the `onboarding@resend.dev` sender is for limited testing.
 
 After deploying the image and updating `.env`, recreate the backend and Celery containers so they receive the new environment values:

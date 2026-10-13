@@ -7,7 +7,7 @@ import urllib.request
 from decimal import Decimal, InvalidOperation
 from django.conf import settings
 from ..models import Currency, CurrencyRate
-from datetime import date
+from datetime import date, timedelta
 
 
 class CurrencyService:
@@ -30,6 +30,27 @@ class CurrencyService:
 
         if effective_date is None:
             effective_date = date.today()
+
+        week_start = effective_date - timedelta(days=effective_date.weekday())
+        manual_rate = CurrencyRate.objects.filter(
+            base_currency__code=base,
+            target_currency__code=target,
+            effective_date__gte=week_start,
+            effective_date__lte=effective_date,
+            is_manual=True,
+        ).order_by('-effective_date', '-id').first()
+        if manual_rate:
+            return float(manual_rate.rate)
+
+        reverse_manual_rate = CurrencyRate.objects.filter(
+            base_currency__code=target,
+            target_currency__code=base,
+            effective_date__gte=week_start,
+            effective_date__lte=effective_date,
+            is_manual=True,
+        ).order_by('-effective_date', '-id').first()
+        if reverse_manual_rate and reverse_manual_rate.rate != 0:
+            return float(1 / reverse_manual_rate.rate)
 
         db_rate = CurrencyRate.objects.filter(
             base_currency__code=base,

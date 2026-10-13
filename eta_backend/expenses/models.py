@@ -1,5 +1,7 @@
+from datetime import timedelta
 from decimal import Decimal
 from django.conf import settings
+from django.core.cache import cache
 from django.db import models, transaction
 
 
@@ -107,6 +109,7 @@ class CurrencyRate(models.Model):
                         'is_manual': True,
                     },
                 )
+        transaction.on_commit(lambda: cache.delete('active_weekly_rates'))
         return self
 
     def __str__(self):
@@ -146,11 +149,32 @@ class ExpenseEntry(models.Model):
         if self.currency.code == 'EUR':
             return Decimal('1.0')
 
+        week_start = self.date - timedelta(days=self.date.weekday())
         direct_rate = CurrencyRate.objects.filter(
             base_currency=self.currency,
             target_currency__code='EUR',
+            effective_date__gte=week_start,
             effective_date__lte=self.date,
+            is_manual=True,
         ).order_by('-effective_date', '-id').first()
+
+        if direct_rate is None:
+            reverse_rate = CurrencyRate.objects.filter(
+                base_currency__code='EUR',
+                target_currency=self.currency,
+                effective_date__gte=week_start,
+                effective_date__lte=self.date,
+                is_manual=True,
+            ).order_by('-effective_date', '-id').first()
+            if reverse_rate and reverse_rate.rate != 0:
+                return Decimal('1') / Decimal(str(reverse_rate.rate))
+
+        if direct_rate is None:
+            direct_rate = CurrencyRate.objects.filter(
+                base_currency=self.currency,
+                target_currency__code='EUR',
+                effective_date__lte=self.date,
+            ).order_by('-effective_date', '-id').first()
 
         if direct_rate is not None:
             return Decimal(str(direct_rate.rate))

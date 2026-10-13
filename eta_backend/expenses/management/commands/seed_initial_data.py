@@ -108,11 +108,15 @@ class Command(BaseCommand):
         for base, target, rate in rates:
             base_currency = created_currencies[base]
             target_currency = created_currencies[target]
-            CurrencyRate.objects.update_or_create(
+            if not CurrencyRate.objects.filter(
                 base_currency=base_currency,
                 target_currency=target_currency,
-                effective_date=today,
-                defaults={'rate': rate}
-            )
+            ).exists():
+                CurrencyRate.objects.create(
+                    base_currency=base_currency,
+                    target_currency=target_currency,
+                    effective_date=today,
+                    rate=rate,
+                )
 
         self.stdout.write(self.style.SUCCESS('Seeded initial expenses data, currencies, and exchange rates.'))

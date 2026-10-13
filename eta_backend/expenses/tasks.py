@@ -39,6 +39,42 @@ def update_currency_rates():
     if not (eur_curr and usd_curr and ugx_curr):
         return "Error: Currency models (EUR, USD, UGX) must exist in database."
 
+    def latest_rate(base_currency, target_currency, *, manual_only=False, current_week=False):
+        rates = CurrencyRate.objects.filter(
+            base_currency=base_currency,
+            target_currency=target_currency,
+            effective_date__lte=today,
+        )
+        if manual_only:
+            rates = rates.filter(is_manual=True)
+        if current_week:
+            rates = rates.filter(effective_date__gte=start_of_week)
+        else:
+            rates = rates.filter(effective_date__lt=start_of_week)
+        return rates.order_by('-effective_date', '-id').first()
+
+    def resolve_rate(base_currency, target_currency):
+        for manual_only, current_week in (
+            (True, True),
+            (True, False),
+            (False, False),
+            (False, True),
+        ):
+            for source, target, reciprocal in (
+                (base_currency, target_currency, False),
+                (target_currency, base_currency, True),
+            ):
+                rate = latest_rate(
+                    source,
+                    target,
+                    manual_only=manual_only,
+                    current_week=current_week,
+                )
+                if rate and rate.rate:
+                    value = Decimal(str(rate.rate))
+                    return Decimal('1') / value if reciprocal else value
+        return None
+
     # 1. Fetch EUR -> USD rate from Frankfurter
     frankfurter_url = getattr(settings, 'FRANKFURTER_URL', 'https://api.frankfurter.dev')
     url = f"{frankfurter_url}/v1/latest?base=EUR&symbols=USD"
@@ -48,35 +84,27 @@ def update_currency_rates():
         with urllib.request.urlopen(req, timeout=10) as response:
             payload = json.loads(response.read().decode())
             eur_usd_rate = Decimal(str(payload['rates']['USD']))
-    except Exception:
-        eur_usd_rate = Decimal('1.08')
+        if eur_usd_rate <= 0:
+            raise ValueError('Frankfurter returned a non-positive EUR/USD rate.')
+    except Exception as exc:
+        logger.warning("Unable to retrieve the EUR/USD exchange rate from Frankfurter: %s", exc)
+        eur_usd_rate = resolve_rate(eur_curr, usd_curr)
 
-    # 2. Look up manual/latest UGX entries from database
-    latest_eur_ugx = CurrencyRate.objects.filter(
-        base_currency=eur_curr,
-        target_currency=ugx_curr,
-        effective_date__lte=today,
-    ).order_by('-effective_date', '-id').first()
+    # Prefer this week's manual rates, then the last manual rate. Generated
+    # snapshots are fallbacks only, so they cannot supersede a manual update.
+    eur_ugx_rate = resolve_rate(eur_curr, ugx_curr)
+    usd_ugx_rate = resolve_rate(usd_curr, ugx_curr)
 
-    latest_usd_ugx = CurrencyRate.objects.filter(
-        base_currency=usd_curr,
-        target_currency=ugx_curr,
-        effective_date__lte=today,
-    ).order_by('-effective_date', '-id').first()
-
-    # Determine baseline USD -> UGX and EUR -> UGX
-    if latest_usd_ugx:
-        usd_ugx_rate = Decimal(str(latest_usd_ugx.rate))
-    else:
-        usd_ugx_rate = Decimal('3700.0')
-
-    if latest_eur_ugx:
-        eur_ugx_rate = Decimal(str(latest_eur_ugx.rate))
-    elif latest_usd_ugx:
+    if eur_usd_rate is None and eur_ugx_rate and usd_ugx_rate:
+        eur_usd_rate = eur_ugx_rate / usd_ugx_rate
+    if eur_usd_rate is None:
+        return "Error: No EUR/USD exchange rate is available from the provider or saved rates."
+    if eur_ugx_rate is None and usd_ugx_rate is not None:
         eur_ugx_rate = eur_usd_rate * usd_ugx_rate
-    else:
-        eur_ugx_rate = Decimal('4100.0')
+    if usd_ugx_rate is None and eur_ugx_rate is not None:
         usd_ugx_rate = eur_ugx_rate / eur_usd_rate
+    if eur_ugx_rate is None or usd_ugx_rate is None:
+        return "Error: No EUR/UGX or USD/UGX exchange rate is available from saved rates."
 
     # Calculate remaining inverse cross-rates
     usd_eur_rate = Decimal('1.0') / eur_usd_rate
@@ -94,11 +122,20 @@ def update_currency_rates():
     ]
 
     for base, target, rate in rate_map:
+        manual_current_week = CurrencyRate.objects.filter(
+            base_currency=base,
+            target_currency=target,
+            effective_date__gte=start_of_week,
+            effective_date__lte=today,
+            is_manual=True,
+        ).exists()
+        if manual_current_week:
+            continue
         CurrencyRate.objects.update_or_create(
             base_currency=base,
             target_currency=target,
             effective_date=start_of_week,
-            defaults={'rate': rate},
+            defaults={'rate': rate, 'is_manual': False},
         )
 
     # 4. Cache multi-currency matrix

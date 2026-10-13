@@ -1,8 +1,11 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
+from unittest.mock import patch
 
 import pytest
 from rest_framework import status
+
+from expenses.models import Currency, CurrencyRate
 
 
 @pytest.mark.integration
@@ -154,6 +157,40 @@ class TestCurrencyConversionAPIContract:
         assert 'USD' in data['rates']
         assert 'UGX' in data['rates']
         assert data['rates']['EUR']['USD'] > 0
+
+    def test_current_rates_endpoint_prefers_manual_rate_over_newer_snapshot(
+        self, authenticated_client
+    ):
+        today = date.today()
+        week_start = today - timedelta(days=today.weekday())
+        eur = Currency.objects.create(code='EUR', name='Euro')
+        usd = Currency.objects.create(code='USD', name='US Dollar')
+        ugx = Currency.objects.create(code='UGX', name='Ugandan Shilling')
+        CurrencyRate.objects.create(
+            base_currency=usd,
+            target_currency=ugx,
+            rate=Decimal('4055'),
+            effective_date=week_start + timedelta(days=1),
+            is_manual=True,
+        )
+        CurrencyRate.objects.create(
+            base_currency=usd,
+            target_currency=ugx,
+            rate=Decimal('3800'),
+            effective_date=week_start + timedelta(days=2),
+        )
+
+        with (
+            patch('expenses.views.timezone.localdate', return_value=week_start + timedelta(days=6)),
+            patch('expenses.views.cache.get', return_value=None),
+            patch('expenses.views.cache.set'),
+        ):
+            response = authenticated_client.get('/api/rates/current/')
+
+        assert response.status_code == status.HTTP_200_OK
+        rates = response.json()['rates']
+        assert rates['USD']['UGX'] == 4055.0
+        assert rates['UGX']['USD'] == pytest.approx(1 / 4055)
 
     def test_convert_same_currency(self, authenticated_client):
         response = authenticated_client.get('/api/convert-currency/?base=EUR&target=EUR&amount=100')

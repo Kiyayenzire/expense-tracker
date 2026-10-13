@@ -68,16 +68,90 @@ class CurrencyTaskTestCase(TestCase):
         self.assertEqual(eur_ugx.rate, Decimal('4200.0'))
 
     @patch('urllib.request.urlopen')
-    def test_update_currency_rates_fallback_defaults(self, mock_urlopen):
+    def test_update_currency_rates_carries_forward_saved_rates_when_provider_is_down(self, mock_urlopen):
         mock_urlopen.side_effect = Exception('API down')
+        previous_week = self.start_of_week - timedelta(days=1)
+        CurrencyRate.objects.create(
+            base_currency=self.eur,
+            target_currency=self.ugx,
+            rate=Decimal('4200.0'),
+            effective_date=previous_week - timedelta(days=3),
+            is_manual=True,
+        )
+        CurrencyRate.objects.create(
+            base_currency=self.eur,
+            target_currency=self.usd,
+            rate=Decimal('1.10'),
+            effective_date=previous_week,
+        )
+        CurrencyRate.objects.create(
+            base_currency=self.eur,
+            target_currency=self.ugx,
+            rate=Decimal('4100.0'),
+            effective_date=previous_week,
+        )
+
+        result = update_currency_rates()
+
+        self.assertIn('Rates updated for week', result)
+        eur_ugx = CurrencyRate.objects.get(
+            base_currency=self.eur,
+            target_currency=self.ugx,
+            effective_date=self.start_of_week,
+        )
+        self.assertEqual(eur_ugx.rate, Decimal('4200.0'))
+        usd_ugx = CurrencyRate.objects.get(
+            base_currency=self.usd,
+            target_currency=self.ugx,
+            effective_date=self.start_of_week,
+        )
+        self.assertAlmostEqual(float(usd_ugx.rate), 4200.0 / 1.10, places=2)
+
+    @patch('urllib.request.urlopen')
+    def test_update_currency_rates_reports_missing_rates_without_static_defaults(self, mock_urlopen):
+        mock_urlopen.side_effect = Exception('API down')
+
+        result = update_currency_rates()
+
+        self.assertIn('Error:', result)
+        self.assertEqual(CurrencyRate.objects.count(), 0)
+
+    @patch('urllib.request.urlopen')
+    def test_update_currency_rates_preserves_current_week_manual_ugx_rates(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps({'rates': {'USD': 1.08}}).encode('utf-8')
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+        CurrencyRate(
+            base_currency=self.usd,
+            target_currency=self.ugx,
+            rate=Decimal('3900.0'),
+            effective_date=self.start_of_week,
+        ).save_as_manual()
+        CurrencyRate(
+            base_currency=self.eur,
+            target_currency=self.ugx,
+            rate=Decimal('4300.0'),
+            effective_date=self.start_of_week,
+        ).save_as_manual()
 
         update_currency_rates()
 
-        eur_ugx = CurrencyRate.objects.get(base_currency=self.eur, target_currency=self.ugx)
-        self.assertEqual(eur_ugx.rate, Decimal('4100.0'))
-
-        usd_ugx = CurrencyRate.objects.get(base_currency=self.usd, target_currency=self.ugx)
-        self.assertAlmostEqual(float(usd_ugx.rate), 4100.0 / 1.08, places=2)
+        self.assertEqual(
+            CurrencyRate.objects.get(
+                base_currency=self.usd,
+                target_currency=self.ugx,
+                effective_date=self.start_of_week,
+            ).rate,
+            Decimal('3900.0'),
+        )
+        self.assertEqual(
+            CurrencyRate.objects.get(
+                base_currency=self.eur,
+                target_currency=self.ugx,
+                effective_date=self.start_of_week,
+            ).rate,
+            Decimal('4300.0'),
+        )
 
     @patch('django.utils.timezone.localdate')
     def test_send_currency_update_reminder_triggers_when_only_one_updated(self, mock_localdate):
@@ -244,6 +318,20 @@ class CurrencyTaskTestCase(TestCase):
         self.assertTrue(direct.is_manual)
         self.assertEqual(reciprocal.rate, Decimal('0.0002466091245'))
         self.assertTrue(reciprocal.is_manual)
+
+    def test_admin_entry_invalidates_cached_rates(self):
+        cache.set('active_weekly_rates', {'EUR': {'UGX': 4100.0}})
+        rate_obj = CurrencyRate(
+            base_currency=self.usd,
+            target_currency=self.ugx,
+            rate=Decimal('4055'),
+            effective_date=self.start_of_week,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            rate_obj.save_as_manual()
+
+        self.assertIsNone(cache.get('active_weekly_rates'))
 
     def test_admin_manual_checkbox_is_checked_and_not_editable(self):
         form_class = CurrencyRateAdmin(model=CurrencyRate, admin_site=None).get_form(None)
