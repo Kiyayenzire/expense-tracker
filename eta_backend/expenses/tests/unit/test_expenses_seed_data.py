@@ -10,7 +10,7 @@ from expenses.models import Category, Currency, CurrencyRate, Item, SubCategory
 @pytest.mark.django_db
 def test_seed_command_adds_transport_and_health_subcategories_idempotently():
     expected_subcategories = {
-        'Transport': {'Boda Boda', 'Car Insurance', 'Repairs', 'Tires'},
+        'Transport': {'Boda Boda', 'Fuel', 'Car Insurance', 'Repairs', 'Tires'},
         'Health Care': {'Health Insurance', 'Tests', 'Supplements'},
     }
     transport = Category.objects.create(name='Transport')
@@ -24,6 +24,8 @@ def test_seed_command_adds_transport_and_health_subcategories_idempotently():
         assert set(category.subcategories.values_list('name', flat=True)) >= subcategory_names
         assert set(Item.objects.filter(category=category).values_list('description', flat=True)) >= subcategory_names
     assert not transport.subcategories.filter(name='Boda Boda Transport').exists()
+    fuel = transport.subcategories.get(name='Fuel')
+    assert Item.objects.get(category=transport, subcategory=fuel).measurement == 'ltr'
 
     call_command('seed_initial_data')
 
